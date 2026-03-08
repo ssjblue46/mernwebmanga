@@ -80,7 +80,7 @@ function SignUp({ setMode }) {
 
         setLoading(true);
         try {
-            const res = await axios.post("http://localhost:5000/register", {
+            await axios.post("http://localhost:5000/register", {
                 name: username,
                 email,
                 password,
