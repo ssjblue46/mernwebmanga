@@ -18,7 +18,7 @@ app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // MongoDB connection
-mongoose.connect("mongodb://127.0.0.1:27017/pdfCollection", {
+mongoose.connect("process.env.MONGO_URI", {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
