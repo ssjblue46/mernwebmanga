@@ -10,7 +10,7 @@ const nodemailer = require("nodemailer");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const path = require("path");
+
 
 
 app.use(cors());
