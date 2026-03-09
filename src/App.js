@@ -1,12 +1,12 @@
 import { BrowserRouter as Router, Link, Routes, Route } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import Home from './Home.js';
-import Search from './Search.js';
-import About from './About.js';
-import LoginPage from './LoginPage.js';
-import SignUp from './SignUp.js';
-import Otp from './Otp.js';
-import MainAppContent from './MainAppContent.js';
+import Home from './Home';
+import Search from './Search';
+import About from './About';
+import LoginPage from './LoginPage';
+import SignUp from './SignUp';
+import Otp from './Otp';
+import MainAppContent from './MainAppContent';
 import './App.css';
 
 function App() {
