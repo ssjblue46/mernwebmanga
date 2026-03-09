@@ -342,8 +342,11 @@ app.delete("/api/pdfs/:filename", (req, res) => {
     res.json({ message: "PDF deleted" });
   });
 });
+app.use(express.static(path.join(__dirname, "client/build")));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "client/build/index.html"));
+});
 
 console.log("MONGO_URI:", process.env.MONGO_URI);
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
-
