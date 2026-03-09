@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "echo build complete",
+    "build": "react-scripts build",
     "dev": "nodemon server.js"
    
   },
