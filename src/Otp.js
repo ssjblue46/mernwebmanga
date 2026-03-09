@@ -44,6 +44,10 @@ function Otp({ setMode, setLoggedIn, setUserRole, setUserEmail }) {
     }
   }, [email, setMode]);
 
+  if (!email) {
+    return null;
+  }
+
   return (
     <div className="OB">
       <h1>OTP Verification</h1>
