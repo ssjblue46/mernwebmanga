@@ -18,7 +18,7 @@ app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // MongoDB connection
-mongoose.connect("mongodb+srv://raj:<db_password>@cluster0.3swrnlq.mongodb.net/?appName=Cluster0", {
+mongoose.connect("mongodb+srv://raj:Raj%40101105@cluster0.3swrnlq.mongodb.net/?appName=Cluster0", {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
