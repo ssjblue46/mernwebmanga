@@ -36,7 +36,7 @@ function About() {
         This website is my way of sharing comics digitally with a modern, user-friendly
         platform.
       </p>
-
+      <button><a href="https://ssjblue46-v0-manga-creation-app.vercel.app/">Go to Manga Creator App </a></button>
       {/* Social Icons */}
       <div
         style={{
@@ -46,6 +46,7 @@ function About() {
           gap: "20px",
         }}
       >
+
         {/* YouTube */}
         <a href="https://m.youtube.com/@Raj_Tamboskar/" target="_blank" rel="noopener noreferrer">
           <img
@@ -102,3 +103,4 @@ function About() {
 }
 
 export default About;
+
