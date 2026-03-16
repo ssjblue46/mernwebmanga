@@ -36,7 +36,7 @@ function About() {
         This website is my way of sharing comics digitally with a modern, user-friendly
         platform.
       </p>
-      <button><a href="https://ssjblue46-v0-manga-creation-app.vercel.app/">Go to Manga Creator App </a></button>
+      <button><a href="https://ssjblue46-v0-manga-creation-app.vercel.app/" style={{}} >Go to Manga Creator App </a></button>
       {/* Social Icons */}
       <div
         style={{
