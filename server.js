@@ -286,17 +286,11 @@ app.post("/api/pdfs", upload.array("pdfs"), async (req, res) => {
   try {
     const files = req.files.map(file => ({
       name: file.originalname,
-      url: `http://localhost:${PORT}/uploads/${file.filename}`,
+      url: `https://mernwebmanga.onrender.com/uploads/${file.filename}`,
     }));
 
-
-
-
-    // Optional: save to MongoDB
+    // Save to MongoDB
     await PDF.insertMany(files).catch(() => {});
-
-
-
 
     res.json(files);
   } catch (err) {
@@ -304,7 +298,6 @@ app.post("/api/pdfs", upload.array("pdfs"), async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
 
 
 
