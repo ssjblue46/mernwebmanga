@@ -18,7 +18,7 @@ app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // MongoDB connection
-mongoose.connect("mongodb+srv://raj:Raj%40101105@cluster0.3swrnlq.mongodb.net/?appName=Cluster0", {
+const mongoConnection = mongoose.connect("mongodb+srv://raj:Raj%40101105@cluster0.3swrnlq.mongodb.net/?appName=Cluster0", {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
@@ -62,8 +62,12 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 // Create default admin user if it doesn't exist
 const createDefaultAdmin = async () => {
   try {
-    // Delete any existing admin user first
-    await User.deleteMany({ role: 'admin' });
+    // Check if admin already exists
+    const existingAdmin = await User.findOne({ email: 'rajmt2005@gmail.com' });
+    if (existingAdmin) {
+      console.log('✅ Admin user already exists: rajmt2005@gmail.com');
+      return;
+    }
     
     const hashedPassword = await bcrypt.hash('Raj@101105', 10);
     const admin = new User({
@@ -81,8 +85,12 @@ const createDefaultAdmin = async () => {
   }
 };
 
-// Call the function after MongoDB connection
-setTimeout(createDefaultAdmin, 2000);
+// Call the function after MongoDB connection is established
+mongoConnection.then(() => {
+  createDefaultAdmin();
+}).catch((err) => {
+  console.error('MongoDB connection failed, skipping admin creation:', err);
+});
 
 // Authentication endpoints
 // Register endpoint
