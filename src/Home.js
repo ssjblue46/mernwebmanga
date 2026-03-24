@@ -102,7 +102,7 @@ function Home({ pdfs, setPdfs }) {
     e.currentTarget.style.transform = "scale(1.1)";
   }}
   onMouseOut={(e) => {
-    e.currentTarget.style.background = "#f77f0fff";
+    e.currentTarget.style.background = "#1c1c1c";
     e.currentTarget.style.boxShadow = "none";
     e.currentTarget.style.transform = "scale(1)";
   }}
