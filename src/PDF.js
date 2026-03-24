@@ -1,24 +1,14 @@
 const mongoose = require('mongoose');
 
 const pdfSchema = new mongoose.Schema({
-  title: {
+  name: {
     type: String,
     required: true,
   },
-  uploadedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-  },
-  fileUrl: {
+  url: {
     type: String,
     required: true,
   },
-  description: String,
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+}, { timestamps: true });
 
 module.exports = mongoose.model('PDF', pdfSchema);
