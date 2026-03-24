@@ -322,7 +322,7 @@ app.get("/api/pdfs", (req, res) => {
       .filter(f => f.endsWith(".pdf"))
       .map(file => ({
         name: file.replace(/^\d+-/, ""), // remove timestamp prefix
-        url: `http://localhost:${PORT}/uploads/${file}`,
+        url: `/uploads/${file}`,
       }));
 
 
