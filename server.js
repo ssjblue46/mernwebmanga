@@ -11,21 +11,24 @@ const nodemailer = require("nodemailer");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-
-
 app.use(cors());
 app.use(express.json());
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// MongoDB connection
-const mongoConnection = mongoose.connect("mongodb+srv://raj:Raj%40101105@cluster0.3swrnlq.mongodb.net/?appName=Cluster0", {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
+/* ✅ CREATE UPLOADS FOLDER AUTO */
+const uploadDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
+/* ✅ SERVE UPLOADS */
+app.use("/uploads", express.static(uploadDir));
+
+/* ✅ MongoDB */
+mongoose.connect("mongodb+srv://raj:Raj%40101105@cluster0.3swrnlq.mongodb.net/?appName=Cluster0")
   .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+  .catch((err) => console.error("MongoDB error:", err));
 
-// User schema
+/* ✅ Schemas */
 const userSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true },
@@ -35,7 +38,6 @@ const userSchema = new mongoose.Schema({
   isVerified: { type: Boolean, default: false }
 }, { timestamps: true });
 
-// PDF schema
 const pdfSchema = new mongoose.Schema({
   name: String,
   url: String,
@@ -44,310 +46,66 @@ const pdfSchema = new mongoose.Schema({
 const User = mongoose.model("User", userSchema);
 const PDF = mongoose.model("PDF", pdfSchema);
 
-// OTP storage (in production, use Redis or database)
-const otpStorage = new Map();
-
-// Email configuration
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER || 'your-email@gmail.com',
-    pass: process.env.EMAIL_PASS || 'your-app-password'
-  }
-});
-
-// JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-
-// Create default admin user if it doesn't exist
-const createDefaultAdmin = async () => {
-  try {
-    // Check if admin already exists
-    const existingAdmin = await User.findOne({ email: 'rajmt2005@gmail.com' });
-    if (existingAdmin) {
-      console.log('✅ Admin user already exists: rajmt2005@gmail.com');
-      return;
-    }
-    
-    const hashedPassword = await bcrypt.hash('Raj@101105', 10);
-    const admin = new User({
-      name: 'Admin',
-      email: 'rajmt2005@gmail.com',
-      password: hashedPassword,
-      role: 'admin',
-      company: 'MangaVerse',
-      isVerified: true
-    });
-    await admin.save();
-    console.log('✅ Admin user created: rajmt2005@gmail.com / Raj@101105');
-  } catch (err) {
-    console.error('Error creating admin user:', err);
-  }
-};
-
-// Call the function after MongoDB connection is established
-mongoConnection.then(() => {
-  createDefaultAdmin();
-}).catch((err) => {
-  console.error('MongoDB connection failed, skipping admin creation:', err);
-});
-
-// Authentication endpoints
-// Register endpoint
-app.post("/register", async (req, res) => {
-  try {
-    const { name, email, password, company } = req.body;
-    
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user
-    const user = new User({
-      name,
-      email,
-      password: hashedPassword,
-      role: 'creator', // New registrations are creators
-      company
-    });
-
-    await user.save();
-    res.json({ message: "User registered successfully" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Login endpoint
-app.post("/login", async (req, res) => {
-  try {
-    const { email, password, role } = req.body;
-    
-    // Find user
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
-
-    // Check password
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    if (!isValidPassword) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
-
-    // Check role
-    if (role && user.role !== role) {
-      return res.status(400).json({ message: "Invalid role" });
-    }
-
-    // Admin requires OTP
-    if (user.role === 'admin') {
-      return res.json({ 
-        message: "OTP required",
-        role: user.role 
-      });
-    }
-
-    // Creator gets direct access
-    if (user.role === 'creator') {
-      const token = jwt.sign(
-        { userId: user._id, email: user.email, role: user.role },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-      
-      return res.json({
-        message: "Login successful",
-        token,
-        user: { id: user._id, email: user.email, name: user.name, role: user.role }
-      });
-    }
-
-    // Reader gets direct access
-    if (user.role === 'reader') {
-      const token = jwt.sign(
-        { userId: user._id, email: user.email, role: user.role },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-      
-      return res.json({
-        message: "Login successful",
-        token,
-        user: { id: user._id, email: user.email, name: user.name, role: user.role }
-      });
-    }
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Send OTP endpoint
-app.post("/send-otp", async (req, res) => {
-  try {
-    const { email } = req.body;
-    
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // Store OTP with expiration (5 minutes)
-    otpStorage.set(email, {
-      otp,
-      expires: Date.now() + 5 * 60 * 1000 // 5 minutes
-    });
-
-    // For development, log OTP to console with prominent formatting
-    console.log('\n' + '='.repeat(50));
-    console.log(`🔐 ADMIN OTP VERIFICATION`);
-    console.log('='.repeat(50));
-    console.log(`📧 Email: ${email}`);
-    console.log(`🔢 OTP Code: ${otp}`);
-    console.log(`⏰ Expires in: 5 minutes`);
-    console.log('='.repeat(50) + '\n');
-
-    // In production, send email
-    try {
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER || 'your-email@gmail.com',
-        to: email,
-        subject: 'Your OTP for MangaVerse',
-        text: `Your OTP is: ${otp}. This code will expire in 5 minutes.`
-      });
-      console.log('📧 OTP email sent successfully');
-    } catch (emailErr) {
-      console.log("⚠️  Email sending failed, but OTP is logged to console above");
-    }
-
-    res.json({ message: "OTP sent successfully" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Verify OTP endpoint
-app.post("/verify-otp", async (req, res) => {
-  try {
-    const { email, otp } = req.body;
-    
-    // Check if OTP exists and is valid
-    const storedData = otpStorage.get(email);
-    if (!storedData) {
-      return res.status(400).json({ message: "OTP not found or expired" });
-    }
-
-    if (Date.now() > storedData.expires) {
-      otpStorage.delete(email);
-      return res.status(400).json({ message: "OTP expired" });
-    }
-
-    if (storedData.otp !== otp) {
-      return res.status(400).json({ message: "Invalid OTP" });
-    }
-
-    // OTP is valid, get user and create token
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ message: "User not found" });
-    }
-
-    const token = jwt.sign(
-      { userId: user._id, email: user.email, role: user.role },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    // Clean up OTP
-    otpStorage.delete(email);
-
-    res.json({
-      message: "OTP verified successfully",
-      token,
-      user: { id: user._id, email: user.email, name: user.name, role: user.role }
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Multer setup for uploads
+/* ✅ Multer */
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
+  destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname)
 });
 const upload = multer({ storage });
 
-
-
-
-// Upload PDFs
+/* ✅ UPLOAD API */
 app.post("/api/pdfs", upload.array("pdfs"), async (req, res) => {
   try {
     const files = req.files.map(file => ({
       name: file.originalname,
-      url: `https://mernwebmanga.onrender.com/uploads/${file.filename}`,
+      url: `/uploads/${file.filename}`, // IMPORTANT FIX
     }));
 
-    // Save to MongoDB
-    await PDF.insertMany(files).catch(() => {});
+    await PDF.insertMany(files);
 
     res.json(files);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Upload failed" });
   }
 });
 
-
-
-// Get all PDFs from **uploads folder**
+/* ✅ GET PDFs (FIXED - NO CRASH) */
 app.get("/api/pdfs", (req, res) => {
-  const folderPath = path.join(__dirname, "uploads");
-  fs.readdir(folderPath, (err, files) => {
-    if (err) return res.status(500).json({ message: "Cannot read uploads folder" });
+  if (!fs.existsSync(uploadDir)) {
+    return res.json([]); // IMPORTANT FIX
+  }
 
-
-
+  fs.readdir(uploadDir, (err, files) => {
+    if (err) return res.json([]);
 
     const pdfs = files
       .filter(f => f.endsWith(".pdf"))
       .map(file => ({
-        name: file.replace(/^\d+-/, ""), // remove timestamp prefix
+        name: file.replace(/^\d+-/, ""),
         url: `/uploads/${file}`,
       }));
-
-
-
 
     res.json(pdfs);
   });
 });
 
-
-
-
-// Optional: delete PDF by filename
+/* ✅ DELETE */
 app.delete("/api/pdfs/:filename", (req, res) => {
-  const filePath = path.join(__dirname, "uploads", req.params.filename);
+  const filePath = path.join(uploadDir, req.params.filename);
+
   fs.unlink(filePath, err => {
     if (err) return res.status(404).json({ message: "File not found" });
-    res.json({ message: "PDF deleted" });
+    res.json({ message: "Deleted" });
   });
 });
+
+/* ✅ FRONTEND BUILD */
 app.use(express.static(path.join(__dirname, "build")));
 
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "build", "index.html"));
 });
 
-console.log("MONGO_URI:", process.env.MONGO_URI);
+/* ✅ START SERVER */
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
