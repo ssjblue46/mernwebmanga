@@ -1,8 +1,10 @@
-// (LoginPage.js)
 import { useState } from "react";
 import axios from "axios";
 
-function LoginPage({ setMode, setLoggedIn, setUserRole, setUserEmail }) {
+// ✅ Using your Live Render URL
+const API_BASE_URL = "https://onrender.com";
+
+function LoginPage({ setLoggedIn, setUserRole, setUserEmail }) {
   const [selectedRole, setSelectedRole] = useState("reader");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -10,7 +12,7 @@ function LoginPage({ setMode, setLoggedIn, setUserRole, setUserEmail }) {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // Default Admin credentials (created by server)
+  // Default Admin credentials
   const ADMIN_EMAIL = "rajmt2005@gmail.com";
   const ADMIN_PASSWORD = "Raj@101105";
 
@@ -24,66 +26,33 @@ function LoginPage({ setMode, setLoggedIn, setUserRole, setUserEmail }) {
     setLoggedIn(true);
   };
 
-  // Quick login for reader (no credentials)
-  const quickRoleLogin = (role) => {
-    saveLogin(role);
-  };
-
-  // Admin login (requires OTP + email/password)
-  const handleAdminLogin = async () => {
+  // Login handler for Admin & Creator
+  const handleAuthLogin = async () => {
     setError("");
     if (!email || !password) {
-      setError("Please enter admin email and password");
+      setError(`Please enter ${selectedRole} email and password`);
       return;
     }
 
     setLoading(true);
     try {
-      const res = await axios.post("http://localhost:5000/login", {
+      const res = await axios.post(`${API_BASE_URL}/login`, {
         email,
         password,
-        role: "admin"
+        role: selectedRole
       });
 
-      if (res.data.message === "OTP required") {
-        localStorage.setItem("pendingLoginRole", "admin");
-        localStorage.setItem("pendingLoginEmail", email);
-        
-        await axios.post("http://localhost:5000/send-otp", { email });
-        setMode("otp");
-      } else {
-        setError("Unexpected response from server");
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || "Admin login failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Creator login (email/password only, no OTP)
-  const handleCreatorLogin = async () => {
-    setError("");
-    if (!email || !password) {
-      setError("Please enter email and password");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await axios.post("http://localhost:5000/login", {
-        email,
-        password,
-        role: "creator"
-      });
-
+      // Direct login if successful
       if (res.data.token) {
-        saveLogin("creator", email, res.data.token);
+        saveLogin(selectedRole, email, res.data.token);
+      } else if (res.data.message === "Login successful" || res.status === 200) {
+        // Fallback for different API response styles
+        saveLogin(selectedRole, email);
       } else {
-        setError("Login failed");
+        setError("Login failed. Please check credentials.");
       }
     } catch (err) {
-      setError(err.response?.data?.message || "Creator login failed");
+      setError(err.response?.data?.message || `${selectedRole} login failed. Check connection.`);
     } finally {
       setLoading(false);
     }
@@ -95,12 +64,11 @@ function LoginPage({ setMode, setLoggedIn, setUserRole, setUserEmail }) {
     if (role === "admin") {
       setEmail(ADMIN_EMAIL);
       setPassword(ADMIN_PASSWORD);
+    } else if (role === "reader") {
+      saveLogin("reader", "Guest Reader");
     } else {
       setEmail("");
       setPassword("");
-    }
-    if (role === "reader") {
-      quickRoleLogin("reader");
     }
   };
 
@@ -109,11 +77,7 @@ function LoginPage({ setMode, setLoggedIn, setUserRole, setUserEmail }) {
       <div className="auth-card login-card">
         <div className="auth-header">
           <div className="avatar-container">
-            <img
-              src="/user.png"
-              alt="profile pic"
-              className="auth-avatar"
-            />
+            <img src="/user.png" alt="profile pic" className="auth-avatar" />
           </div>
           <h1 className="auth-title">Welcome to MangaVerse</h1>
           <p className="auth-subtitle">Sign in to continue</p>
@@ -125,42 +89,38 @@ function LoginPage({ setMode, setLoggedIn, setUserRole, setUserEmail }) {
             onClick={() => handleRoleChange("admin")}
             className={`role-btn ${selectedRole === "admin" ? "active" : ""}`}
           >
-            <span className="role-icon">👑</span>
-            Admin
+            <span className="role-icon">👑</span> Admin
           </button>
           <button
             onClick={() => handleRoleChange("creator")}
             className={`role-btn ${selectedRole === "creator" ? "active" : ""}`}
           >
-            <span className="role-icon">✍️</span>
-            Creator
+            <span className="role-icon">✍️</span> Creator
           </button>
           <button
             onClick={() => handleRoleChange("reader")}
             className={`role-btn ${selectedRole === "reader" ? "active" : ""}`}
           >
-            <span className="role-icon">📖</span>
-            Reader
+            <span className="role-icon">📖</span> Reader
           </button>
         </div>
 
         {/* Error Message */}
         {error && (
           <div className="error-message">
-            <span className="error-icon">⚠️</span>
-            {error}
+            <span className="error-icon">⚠️</span> {error}
           </div>
         )}
 
-        {/* Admin Login Form */}
-        {selectedRole === "admin" && (
+        {/* Login Form for Admin & Creator */}
+        {(selectedRole === "admin" || selectedRole === "creator") && (
           <div className="auth-form">
             <div className="input-group">
-              <label htmlFor="admin-email">Email</label>
+              <label htmlFor="auth-email">Email</label>
               <input
-                id="admin-email"
+                id="auth-email"
                 type="email"
-                placeholder="Enter admin email"
+                placeholder={`Enter ${selectedRole} email`}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="auth-input"
@@ -168,12 +128,12 @@ function LoginPage({ setMode, setLoggedIn, setUserRole, setUserEmail }) {
               />
             </div>
             <div className="input-group">
-              <label htmlFor="admin-password">Password</label>
+              <label htmlFor="auth-password">Password</label>
               <div className="password-input-wrapper">
                 <input
-                  id="admin-password"
+                  id="auth-password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Enter admin password"
+                  placeholder={`Enter ${selectedRole} password`}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="auth-input"
@@ -190,69 +150,15 @@ function LoginPage({ setMode, setLoggedIn, setUserRole, setUserEmail }) {
             </div>
             <button
               className="auth-button primary"
-              onClick={handleAdminLogin}
+              onClick={handleAuthLogin}
               disabled={loading}
             >
               {loading ? (
                 <>
-                  <span className="spinner"></span>
-                  Logging in...
+                  <span className="spinner"></span> Logging in...
                 </>
               ) : (
-                "Admin Login"
-              )}
-            </button>
-          </div>
-        )}
-
-        {/* Creator Login Form */}
-        {selectedRole === "creator" && (
-          <div className="auth-form">
-            <div className="input-group">
-              <label htmlFor="creator-email">Email</label>
-              <input
-                id="creator-email"
-                type="email"
-                placeholder="Enter creator email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="auth-input"
-                disabled={loading}
-              />
-            </div>
-            <div className="input-group">
-              <label htmlFor="creator-password">Password</label>
-              <div className="password-input-wrapper">
-                <input
-                  id="creator-password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter creator password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="auth-input"
-                  disabled={loading}
-                />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? "👁️" : "👁️‍🗨️"}
-                </button>
-              </div>
-            </div>
-            <button
-              className="auth-button primary"
-              onClick={handleCreatorLogin}
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <span className="spinner"></span>
-                  Logging in...
-                </>
-              ) : (
-                "Creator Login"
+                `${selectedRole === 'admin' ? 'Admin' : 'Creator'} Login`
               )}
             </button>
           </div>
@@ -263,25 +169,10 @@ function LoginPage({ setMode, setLoggedIn, setUserRole, setUserEmail }) {
           <div className="reader-info">
             <div className="info-card">
               <span className="info-icon">📚</span>
-              <h3>Reader Access</h3>
-              <p>You can view all comics freely without any restrictions.</p>
-              <p className="info-note">You're already logged in as a Reader!</p>
+              <p>Entering the library as a Guest...</p>
             </div>
           </div>
         )}
-
-        {/* Sign Up Link */}
-        <div className="auth-footer">
-          <p>
-            Don't have an account?{" "}
-            <span
-              className="auth-link"
-              onClick={() => setMode("signup")}
-            >
-              Sign Up
-            </span>
-          </p>
-        </div>
       </div>
     </div>
   );
