@@ -42,19 +42,29 @@ const pdfSchema = new mongoose.Schema({
 
 const PDF = mongoose.model("PDF", pdfSchema);
 
-// ✅ 3. GRIDFS STORAGE ENGINE
+// ✅ STABLE STORAGE CONFIG
 const storage = new GridFsStorage({
   url: mongoURI,
-  options: { useUnifiedTopology: true },
+  options: { useUnifiedTopology: true, useNewUrlParser: true }, // Add these flags
   file: (req, file) => {
-    return {
-      filename: Date.now() + "-" + file.originalname,
-      bucketName: "pdfs", // Collection name in Atlas (pdfs.files / pdfs.chunks)
-    };
-  },
+    // This function MUST return an object or it will crash with a 502
+    return new Promise((resolve, reject) => {
+      const fileInfo = {
+        filename: Date.now() + "-" + file.originalname,
+        bucketName: "pdfs"
+      };
+      resolve(fileInfo);
+    });
+  }
+});
+
+// Catch errors on the storage engine itself
+storage.on('connectionError', (err) => {
+  console.error("Storage Connection Error:", err);
 });
 
 const upload = multer({ storage });
+
 
 // ✅ 4. ROUTES
 
