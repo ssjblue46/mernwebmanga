@@ -120,6 +120,27 @@ app.get("/api/file/:filename", async (req, res) => {
     res.status(500).json({ message: "Error streaming file" });
   }
 });
+app.post("/login", async (req, res) => {
+  const { email, password, role } = req.body;
+  
+  try {
+    // 🔍 Find the user in your Atlas 'users' collection
+    const user = await User.findOne({ email, role });
+    
+    if (!user || user.password !== password) { // Use bcrypt.compare in production!
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    // Success logic
+    res.json({ 
+      token: "your-generated-jwt-token", 
+      role: user.role,
+      email: user.email 
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Server error during login" });
+  }
+});
 
 // DELETE PDF
 app.delete("/api/pdfs/:id", async (req, res) => {
@@ -144,6 +165,15 @@ app.use(express.static(path.join(__dirname, "build")));
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "build", "index.html"));
 });
+// ✅ Target the 'users' collection specifically
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  role: { type: String, enum: ['admin', 'creator', 'reader'], default: 'reader' }
+}, { timestamps: true });
+
+// Mongoose will look for a collection named 'users' in 'pdfCollection' db
+const User = mongoose.model("User", userSchema);
 
 // ✅ START SERVER
 app.listen(PORT, () => {
