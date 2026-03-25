@@ -2,116 +2,140 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const multer = require("multer");
-const { GridFsStorage } = require("multer-gridfs-storage"); // ✅ NEW
+const { GridFsStorage } = require("multer-gridfs-storage");
 const path = require("path");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// ✅ REPLACE THIS with your actual Render Environment Variable if possible
 const mongoURI = "mongodb+srv://raj:Raj%40101105@cluster0.3swrnlq.mongodb.net/pdfCollection?retryWrites=true&w=majority";
 
+// ✅ MIDDLEWARE
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "50mb" })); // Increased limit for Manga PDFs
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-/* ✅ MongoDB Connection */
+// ✅ 1. DATABASE CONNECTION
+// We use createConnection for GridFS and mongoose.connect for the Model
 const conn = mongoose.createConnection(mongoURI);
 
-// Initialize GridFS Bucket for streaming
 let bucket;
 conn.once("open", () => {
+  // Initialize GridFS Bucket only after connection is open to avoid 503/500 errors
   bucket = new mongoose.mongo.GridFSBucket(conn.db, {
     bucketName: "pdfs",
   });
-  console.log("MongoDB & GridFS Connected");
+  console.log("✅ MongoDB & GridFS connected successfully");
 });
 
-/* ✅ Schemas */
-// Note: We use the main mongoose instance for models, but conn for GridFS
-mongoose.connect(mongoURI);
+mongoose.connect(mongoURI)
+  .then(() => console.log("✅ Mongoose Model connected"))
+  .catch(err => console.error("❌ Mongoose Error:", err));
 
+// ✅ 2. SCHEMAS
 const pdfSchema = new mongoose.Schema({
   name: String,
-  fileId: mongoose.Schema.Types.ObjectId, // Link to GridFS file
+  fileId: mongoose.Schema.Types.ObjectId, // Points to the actual file in GridFS
   url: String,
 }, { timestamps: true });
 
 const PDF = mongoose.model("PDF", pdfSchema);
 
-/* ✅ GridFS Storage Engine (Replaces DiskStorage) */
+// ✅ 3. GRIDFS STORAGE ENGINE
 const storage = new GridFsStorage({
   url: mongoURI,
+  options: { useUnifiedTopology: true },
   file: (req, file) => {
     return {
       filename: Date.now() + "-" + file.originalname,
-      bucketName: "pdfs", // Collection name in Atlas
+      bucketName: "pdfs", // Collection name in Atlas (pdfs.files / pdfs.chunks)
     };
   },
 });
+
 const upload = multer({ storage });
 
-/* ✅ UPLOAD API (Saves to Atlas) */
+// ✅ 4. ROUTES
+
+// UPLOAD PDF
 app.post("/api/pdfs", upload.array("pdfs"), async (req, res) => {
   try {
-    const files = req.files.map((file) => ({
-      name: file.originalname,
-      fileId: file.id,
-      url: `/api/file/${file.filename}`, // Virtual URL
-    }));
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ message: "No files uploaded" });
+    }
 
-    await PDF.insertMany(files);
-    res.json(files);
+    const savedFiles = [];
+    for (const file of req.files) {
+      const newPdf = new PDF({
+        name: file.originalname,
+        fileId: file.id,
+        url: `/api/file/${file.filename}`,
+      });
+      await newPdf.save();
+      savedFiles.push(newPdf);
+    }
+
+    res.status(201).json(savedFiles);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Upload failed" });
+    console.error("Upload Error:", err);
+    res.status(500).json({ message: "Internal Server Error during upload" });
   }
 });
 
-/* ✅ STREAM API (Fetches from Atlas) */
+// GET ALL PDFs (Metadata)
+app.get("/api/pdfs", async (req, res) => {
+  try {
+    const pdfs = await PDF.find().sort({ createdAt: -1 });
+    res.json(pdfs);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch PDF list" });
+  }
+});
+
+// VIEW/STREAM PDF (Fetches from Atlas)
 app.get("/api/file/:filename", async (req, res) => {
   try {
+    if (!bucket) return res.status(503).json({ message: "Bucket not initialized" });
+
     const file = await bucket.find({ filename: req.params.filename }).next();
     if (!file) return res.status(404).json({ message: "File not found" });
 
     res.set("Content-Type", "application/pdf");
     const readStream = bucket.openDownloadStream(file._id);
+    
+    readStream.on("error", () => res.status(500).end());
     readStream.pipe(res);
   } catch (err) {
     res.status(500).json({ message: "Error streaming file" });
   }
 });
 
-/* ✅ GET ALL PDFs */
-app.get("/api/pdfs", async (req, res) => {
-  try {
-    const pdfs = await PDF.find().sort({ createdAt: -1 });
-    res.json(pdfs);
-  } catch (err) {
-    res.status(500).json({ message: "Fetch failed" });
-  }
-});
-
-/* ✅ DELETE (From Atlas) */
+// DELETE PDF
 app.delete("/api/pdfs/:id", async (req, res) => {
   try {
     const pdf = await PDF.findById(req.params.id);
-    if (!pdf) return res.status(404).json({ message: "Not found" });
+    if (!pdf) return res.status(404).json({ message: "PDF record not found" });
 
-    // Delete from GridFS
+    // Delete chunks and files from GridFS
     await bucket.delete(pdf.fileId);
-    // Delete metadata
+    // Delete metadata record
     await PDF.findByIdAndDelete(req.params.id);
 
-    res.json({ message: "Deleted from Atlas" });
+    res.json({ message: "Deleted successfully from Atlas" });
   } catch (err) {
-    res.status(500).json({ message: "Delete failed" });
+    res.status(500).json({ message: "Failed to delete" });
   }
 });
 
-/* ✅ FRONTEND BUILD */
+// ✅ 5. FRONTEND INTEGRATION
 app.use(express.static(path.join(__dirname, "build")));
+
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "build", "index.html"));
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// ✅ START SERVER
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
