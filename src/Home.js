@@ -1,9 +1,10 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
-const BASE_URL = "https://mernwebmanga.onrender.com"; // ✅ FIXED
+const BASE_URL = "https://mernwebmanga.onrender.com";
 
 function Home({ pdfs, setPdfs }) {
   const fileInputRef = useRef(null);
+  const [loading, setLoading] = useState(false); // Added loading state
 
   // Fetch PDFs
   useEffect(() => {
@@ -11,14 +12,10 @@ function Home({ pdfs, setPdfs }) {
       try {
         const res = await fetch(`${BASE_URL}/api/pdfs`);
         const data = await res.json();
-
-        if (Array.isArray(data)) {
-          setPdfs(data);
-        } else if (Array.isArray(data.pdfs)) {
-          setPdfs(data.pdfs);
-        } else {
-          setPdfs([]);
-        }
+        
+        // Handle different possible API response shapes
+        const list = Array.isArray(data) ? data : (data.pdfs || []);
+        setPdfs(list);
       } catch (err) {
         console.error("Error fetching PDFs:", err);
         setPdfs([]);
@@ -31,8 +28,9 @@ function Home({ pdfs, setPdfs }) {
   // Upload PDFs
   const handleUpload = async (e) => {
     const files = e.target.files;
-    if (!files.length) return;
+    if (!files || files.length === 0) return;
 
+    setLoading(true); // Start loading
     const formData = new FormData();
     for (let i = 0; i < files.length; i++) {
       formData.append("pdfs", files[i]);
@@ -44,41 +42,48 @@ function Home({ pdfs, setPdfs }) {
         body: formData,
       });
 
+      if (!res.ok) throw new Error("Upload failed");
+
       const data = await res.json();
+      const newPdfs = Array.isArray(data) ? data : (data.pdfs || []);
 
-      let newPdfs = [];
-      if (Array.isArray(data)) {
-        newPdfs = data;
-      } else if (Array.isArray(data.pdfs)) {
-        newPdfs = data.pdfs;
-      }
-
+      // If backend returns only new files, append them. 
+      // If it returns the FULL list, use: setPdfs(newPdfs);
       setPdfs((prev) => [...prev, ...newPdfs]);
 
       alert("Upload successful ✅");
     } catch (err) {
       console.error("Upload error:", err);
       alert("Upload failed ❌");
+    } finally {
+      setLoading(false); // End loading
+      e.target.value = ""; // Clear input so you can upload same file again
     }
+  };
+
+  // Helper to ensure URL is clean
+  const getFullUrl = (path) => {
+    if (!path) return "";
+    return path.startsWith("http") ? path : `${BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
   };
 
   return (
     <div className="page home-page">
       <button
+        disabled={loading}
         onClick={() => fileInputRef.current.click()}
         style={{
-          background: "#1c1c1c",
+          background: loading ? "#555" : "#1c1c1c",
           color: "#fff",
           borderRadius: "30px",
           padding: "12px 25px",
           fontWeight: "bold",
           border: "1px solid #333",
-          cursor: "pointer",
-          transition: "all 0.3s ease",
+          cursor: loading ? "not-allowed" : "pointer",
           fontSize: "16px",
         }}
       >
-        📤 Upload PDFs
+        {loading ? "⌛ Uploading..." : "📤 Upload PDFs"}
       </button>
 
       <input
@@ -93,33 +98,31 @@ function Home({ pdfs, setPdfs }) {
       <h2>📁 Manga Collection (PDF)</h2>
 
       <div className="pdf-grid">
-        {(!Array.isArray(pdfs) || pdfs.length === 0) && (
-          <p>No PDFs uploaded yet.</p>
-        )}
+        {pdfs.length === 0 && !loading && <p>No PDFs uploaded yet.</p>}
 
-        {Array.isArray(pdfs) &&
-          pdfs.map((pdf, index) => (
-            <div key={index} className="pdf-card">
-              <iframe
-                src={`${BASE_URL}${pdf.url}#toolbar=0&navpanes=0&scrollbar=0`}
-                title={pdf.name}
-                className="pdf-preview"
-              ></iframe>
+        {pdfs.map((pdf, index) => (
+          <div key={pdf._id || index} className="pdf-card">
+            <iframe
+              src={`${getFullUrl(pdf.url)}#toolbar=0&navpanes=0`}
+              title={pdf.name}
+              className="pdf-preview"
+              style={{ width: "100%", height: "250px", border: "none" }}
+            ></iframe>
 
-              <p className="pdf-name">
-                {pdf.name.replace(/\.pdf$/i, "")}
-              </p>
+            <p className="pdf-name">
+              {(pdf.name || "Untitled").replace(/\.pdf$/i, "")}
+            </p>
 
-              <a
-                href={`${BASE_URL}${pdf.url}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="open-btn"
-              >
-                🔎 Open PDF
-              </a>
-            </div>
-          ))}
+            <a
+              href={getFullUrl(pdf.url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="open-btn"
+            >
+              🔎 Open PDF
+            </a>
+          </div>
+        ))}
       </div>
     </div>
   );
