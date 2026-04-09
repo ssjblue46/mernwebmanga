@@ -10,9 +10,11 @@ const jwt = require("jsonwebtoken");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ===== ENV VARIABLES =====
-const MONGO_URI = process.env.MONGO_URI;
-const JWT_SECRET = process.env.JWT_SECRET;
+// ===== YOUR MONGO URI (FIXED DB NAME) =====
+const MONGO_URI =
+  "mongodb+srv://raj:Raj%40101105@cluster0.3swrnlq.mongodb.net/pdfCollection?retryWrites=true&w=majority&authSource=admin";
+
+const JWT_SECRET = "demo_secret_key";
 
 // ===== MIDDLEWARE =====
 app.use(cors());
@@ -21,7 +23,7 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // ===== MAIN DB CONNECTION =====
 mongoose.connect(MONGO_URI)
-  .then(() => console.log("✅ MongoDB connected"))
+  .then(() => console.log("✅ MongoDB connected to pdfCollection"))
   .catch(err => console.error("❌ Mongo Error:", err));
 
 // ===== GRIDFS CONNECTION =====
@@ -45,7 +47,7 @@ const pdfSchema = new mongoose.Schema({
 
 const PDF = mongoose.model("PDF", pdfSchema);
 
-// ===== USER MODEL =====
+// ===== USER MODEL (USES 'users' COLLECTION) =====
 const userSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true },
@@ -54,7 +56,8 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ["admin", "creator", "reader"], default: "reader" },
 }, { timestamps: true });
 
-const User = mongoose.model("User", userSchema);
+// FORCE collection name = users
+const User = mongoose.model("User", userSchema, "users");
 
 // ===== GRIDFS STORAGE =====
 const storage = new GridFsStorage({
@@ -64,7 +67,7 @@ const storage = new GridFsStorage({
     return new Promise((resolve, reject) => {
 
       if (file.mimetype !== "application/pdf") {
-        return reject(new Error("Only PDF files allowed"));
+        return reject(new Error("Only PDF allowed"));
       }
 
       const fileInfo = {
@@ -77,13 +80,9 @@ const storage = new GridFsStorage({
   }
 });
 
-storage.on("connectionError", (err) => {
-  console.error("Storage Error:", err);
-});
-
 const upload = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB
+  limits: { fileSize: 50 * 1024 * 1024 }
 });
 
 // ===== AUTH ROUTES =====
@@ -115,6 +114,7 @@ app.post("/api/signup", async (req, res) => {
     res.json({ success: true, message: "Account created" });
 
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Signup failed" });
   }
 });
@@ -164,7 +164,7 @@ app.post("/api/login", async (req, res) => {
 
 // ===== PDF ROUTES =====
 
-// UPLOAD PDF
+// UPLOAD
 app.post("/api/pdfs", upload.array("pdfs"), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
@@ -187,12 +187,11 @@ app.post("/api/pdfs", upload.array("pdfs"), async (req, res) => {
     res.status(201).json(savedFiles);
 
   } catch (err) {
-    console.error(err);
     res.status(500).json({ message: "Upload failed" });
   }
 });
 
-// GET ALL PDFs
+// GET ALL
 app.get("/api/pdfs", async (req, res) => {
   try {
     const pdfs = await PDF.find().sort({ createdAt: -1 });
@@ -202,24 +201,18 @@ app.get("/api/pdfs", async (req, res) => {
   }
 });
 
-// STREAM PDF
+// STREAM
 app.get("/api/file/:filename", async (req, res) => {
   try {
-    if (!bucket) {
-      return res.status(503).json({ message: "Server not ready" });
-    }
+    if (!bucket) return res.status(503).json({ message: "Server not ready" });
 
     const file = await bucket.find({ filename: req.params.filename }).next();
 
-    if (!file) {
-      return res.status(404).json({ message: "File not found" });
-    }
+    if (!file) return res.status(404).json({ message: "File not found" });
 
     res.set("Content-Type", "application/pdf");
 
     const stream = bucket.openDownloadStream(file._id);
-
-    stream.on("error", () => res.status(500).end());
     stream.pipe(res);
 
   } catch (err) {
@@ -227,14 +220,12 @@ app.get("/api/file/:filename", async (req, res) => {
   }
 });
 
-// DELETE PDF
+// DELETE
 app.delete("/api/pdfs/:id", async (req, res) => {
   try {
     const pdf = await PDF.findById(req.params.id);
 
-    if (!pdf) {
-      return res.status(404).json({ message: "PDF not found" });
-    }
+    if (!pdf) return res.status(404).json({ message: "Not found" });
 
     if (bucket) {
       await bucket.delete(pdf.fileId);
@@ -242,7 +233,7 @@ app.delete("/api/pdfs/:id", async (req, res) => {
 
     await PDF.findByIdAndDelete(req.params.id);
 
-    res.json({ message: "Deleted successfully" });
+    res.json({ message: "Deleted" });
 
   } catch (err) {
     res.status(500).json({ message: "Delete failed" });
@@ -256,7 +247,7 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "build", "index.html"));
 });
 
-// ===== START SERVER =====
+// ===== START =====
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
