@@ -69,32 +69,39 @@ function Home({ pdfs, setPdfs }) {
 
   return (
     <div className="page home-page">
-      <button
-        disabled={loading}
-        onClick={() => fileInputRef.current.click()}
-        style={{
-          background: loading ? "#555" : "#1c1c1c",
-          color: "#fff",
-          borderRadius: "30px",
-          padding: "12px 25px",
-          fontWeight: "bold",
-          border: "1px solid #333",
-          cursor: loading ? "not-allowed" : "pointer",
-          fontSize: "16px",
-        }}
-      >
-        {loading ? "⌛ Uploading..." : "📤 Upload PDFs"}
-      </button>
+{(userRole === "admin" || userRole === "creator") ? (
+  <>
+    <button
+      disabled={loading}
+      onClick={() => fileInputRef.current.click()}
+      style={{
+        background: loading ? "#555" : "#1c1c1c",
+        color: "#fff",
+        borderRadius: "30px",
+        padding: "12px 25px",
+        fontWeight: "bold",
+        border: "1px solid #333",
+        cursor: loading ? "not-allowed" : "pointer",
+        fontSize: "16px",
+      }}
+    >
+      {loading ? "⌛ Uploading..." : "📤 Upload PDFs"}
+    </button>
 
-      <input
-        type="file"
-        accept="application/pdf"
-        multiple
-        ref={fileInputRef}
-        onChange={handleUpload}
-        style={{ display: "none" }}
-      />
-
+    <input
+      type="file"
+      accept="application/pdf"
+      multiple
+      ref={fileInputRef}
+      onChange={handleUpload}
+      style={{ display: "none" }}
+    />
+  </>
+) : (
+  <p style={{ color: "#aaa", marginTop: "10px" }}>
+    🔒 Only creators/admin can upload PDFs
+  </p>
+)}
       <h2>📁 Manga Collection (PDF)</h2>
 
       <div className="pdf-grid">
