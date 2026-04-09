@@ -5,7 +5,6 @@ import Search from './Search';
 import About from './About';
 import LoginPage from './LoginPage';
 import SignUp from './SignUp';
-import Otp from './Otp';
 import MainAppContent from './MainAppContent';
 import './App.css';
 
@@ -14,7 +13,7 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState('');
   const [userEmail, setUserEmail] = useState('');
-  const [authMode, setAuthMode] = useState('login'); // 'login', 'signup', 'otp'
+  const [authMode, setAuthMode] = useState('login'); // 'login', 'signup'
 
   // Check for existing login on component mount
   useEffect(() => {
@@ -74,14 +73,7 @@ function App() {
         {authMode === 'signup' && (
           <SignUp setMode={setAuthMode} />
         )}
-        {authMode === 'otp' && (
-          <Otp 
-            setMode={setAuthMode}
-            setLoggedIn={setIsLoggedIn}
-            setUserRole={setUserRole}
-            setUserEmail={setUserEmail}
-          />
-        )}
+
       </div>
     );
   }
