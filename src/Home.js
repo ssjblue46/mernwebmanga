@@ -5,7 +5,7 @@ const BASE_URL = "https://mernwebmanga.onrender.com";
 function Home({ pdfs, setPdfs }) {
   const fileInputRef = useRef(null);
   const [loading, setLoading] = useState(false); // Added loading state
-
+  const userRole = localStorage.getItem("userRole");
   // Fetch PDFs
   useEffect(() => {
     const fetchPdfs = async () => {
