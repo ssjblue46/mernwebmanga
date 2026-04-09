@@ -109,6 +109,8 @@ app.post("/api/signup", async (req, res) => {
       email: email.toLowerCase(),
       password: hashed,
       company
+      role: "creator" // ✅ FORCE ROLE HERE
+
     });
 
     res.json({ success: true, message: "Account created" });
