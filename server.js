@@ -108,7 +108,7 @@ app.post("/api/signup", async (req, res) => {
       name,
       email: email.toLowerCase(),
       password: hashed,
-      company
+      company,
       role: "creator" // ✅ FORCE ROLE HERE
 
     });
