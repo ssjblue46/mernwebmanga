@@ -5,6 +5,7 @@ import Search from './Search';
 import About from './About';
 import LoginPage from './LoginPage';
 import SignUp from './SignUp';
+import PaintPage from './Paintpage';
 import MainAppContent from './MainAppContent';
 import './App.css';
 
@@ -87,6 +88,7 @@ function App() {
           <Link to="/">Home</Link>
           <Link to="/search">Search</Link>
           <Link to="/about">About</Link>
+          <Link to="/paintpage">PaintPage</Link>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ color: '#15aee1', fontWeight: 'bold' }}>
               {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
@@ -113,6 +115,7 @@ function App() {
           <Route path="/" element={<MainAppContent pdfs={pdfs} setPdfs={setPdfs} userRole={userRole} />} />
           <Route path="/search" element={<Search pdfs={pdfs} userRole={userRole} />} />
           <Route path="/about" element={<About userRole={userRole} />} />
+          <Route path="/paint" element={<PaintPage />} />
         </Routes>
       </div>
     </Router>
@@ -123,5 +126,3 @@ function App() {
 
 
 export default App;
-
-
