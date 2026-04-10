@@ -115,7 +115,7 @@ function App() {
           <Route path="/" element={<MainAppContent pdfs={pdfs} setPdfs={setPdfs} userRole={userRole} />} />
           <Route path="/search" element={<Search pdfs={pdfs} userRole={userRole} />} />
           <Route path="/about" element={<About userRole={userRole} />} />
-          <Route path="/paint" element={<PaintPage />} />
+          <Route path="/paintpage" element={<PaintPage />} />
         </Routes>
       </div>
     </Router>
