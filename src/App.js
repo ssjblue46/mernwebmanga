@@ -5,7 +5,7 @@ import Search from './Search';
 import About from './About';
 import LoginPage from './LoginPage';
 import SignUp from './SignUp';
-import PaintPage from './Paintpage';
+import PaintPage from './PaintPage';
 import MainAppContent from './MainAppContent';
 import './App.css';
 
