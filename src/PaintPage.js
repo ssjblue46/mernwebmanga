@@ -136,8 +136,50 @@ const PaintPage = () => {
     pdf.save("manga.pdf");
   };
 
-  return (
-    <div style={{ color: "white", padding: "20px", textAlign: "center" }}>
+ return (
+  <div style={{ display: "flex", color: "white" }}>
+
+    {/* 📦 PAGE MANAGER (LEFT SIDE) */}
+    <div style={{
+      width: "120px",
+      borderRight: "2px solid #333",
+      padding: "10px",
+      textAlign: "center"
+    }}>
+      <h4>Pages</h4>
+
+      {pages.map((page, index) => (
+        <div
+          key={page.id}
+          draggable
+          onDragStart={() => (window.dragIndex = index)}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={() => {
+            const updated = [...pages];
+            const dragged = updated.splice(window.dragIndex, 1)[0];
+            updated.splice(index, 0, dragged);
+            setPages(updated);
+          }}
+          style={{
+            margin: "10px 0",
+            padding: "10px",
+            background: "#15aee1",
+            borderRadius: "8px",
+            cursor: "grab",
+            fontWeight: "bold"
+          }}
+        >
+          {index + 1}
+        </div>
+      ))}
+
+      {/* ➕ ➖ inside panel */}
+      <button onClick={addPage} style={{ marginTop: "10px" }}>+</button>
+      <button onClick={removePage} style={{ marginTop: "5px" }}>-</button>
+    </div>
+
+    {/* 🎨 MAIN DRAW AREA */}
+    <div style={{ flex: 1, textAlign: "center", padding: "20px" }}>
       <h2>Draw Manga 🎨</h2>
 
       {/* Toolbar */}
@@ -206,39 +248,7 @@ const PaintPage = () => {
           />
         </div>
       ))}
-
-      {/* ➕ ➖ Buttons */}
-      <button
-        onClick={addPage}
-        style={{
-          position: "fixed",
-          bottom: "20px",
-          right: "20px",
-          width: "60px",
-          height: "60px",
-          borderRadius: "50%",
-          fontSize: "30px"
-        }}
-      >
-        +
-      </button>
-
-      <button
-        onClick={removePage}
-        style={{
-          position: "fixed",
-          bottom: "90px",
-          right: "20px",
-          width: "60px",
-          height: "60px",
-          borderRadius: "50%",
-          fontSize: "30px"
-        }}
-      >
-        -
-      </button>
     </div>
-  );
-};
-
+  </div>
+);
 export default PaintPage;
