@@ -1,80 +1,147 @@
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import { jsPDF } from "jspdf";
 
 const PaintPage = () => {
-  const [pages, setPages] = useState([React.createRef()]);
+  const [pages, setPages] = useState([
+    { id: Date.now(), ref: React.createRef(), history: [], redo: [] }
+  ]);
+
   const [isDrawing, setIsDrawing] = useState(false);
   const [color, setColor] = useState("#000000");
   const [brushSize, setBrushSize] = useState(3);
+  const [eraserSize, setEraserSize] = useState(10);
   const [isErasing, setIsErasing] = useState(false);
 
-  // Start drawing
-  const startDrawing = (e, canvasRef) => {
-    const ctx = canvasRef.current.getContext("2d");
-    ctx.beginPath();
-    ctx.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
-    setIsDrawing(true);
-  };
+  // 🧠 Save state (for undo)
+  const saveState = (ref, pageIndex) => {
+    const canvas = ref.current;
+    const data = canvas.toDataURL();
 
-  // Draw / Erase
-  const draw = (e, canvasRef) => {
-    if (!isDrawing) return;
-    const ctx = canvasRef.current.getContext("2d");
-
-    ctx.strokeStyle = isErasing ? "white" : color;
-    ctx.lineWidth = brushSize;
-    ctx.lineCap = "round";
-
-    ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
-    ctx.stroke();
-  };
-
-  const stopDrawing = () => {
-    setIsDrawing(false);
-  };
-
-  // Clear all pages
-  const clearCanvas = () => {
-    pages.forEach((ref) => {
-      const canvas = ref.current;
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setPages((prev) => {
+      const updated = [...prev];
+      updated[pageIndex].history.push(data);
+      updated[pageIndex].redo = [];
+      return updated;
     });
   };
 
-  // ➕ Add new page
-  const addPage = () => {
-    setPages([...pages, React.createRef()]);
+  // Start drawing (mouse + touch)
+  const startDrawing = (e, ref, index) => {
+    const canvas = ref.current;
+    const rect = canvas.getBoundingClientRect();
+
+    const x = e.touches
+      ? e.touches[0].clientX - rect.left
+      : e.nativeEvent.offsetX;
+
+    const y = e.touches
+      ? e.touches[0].clientY - rect.top
+      : e.nativeEvent.offsetY;
+
+    saveState(ref, index);
+
+    const ctx = canvas.getContext("2d");
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    setIsDrawing(true);
   };
 
-  // 📄 Save ALL pages as PDF
+  const draw = (e, ref) => {
+    if (!isDrawing) return;
+
+    const canvas = ref.current;
+    const rect = canvas.getBoundingClientRect();
+
+    const x = e.touches
+      ? e.touches[0].clientX - rect.left
+      : e.nativeEvent.offsetX;
+
+    const y = e.touches
+      ? e.touches[0].clientY - rect.top
+      : e.nativeEvent.offsetY;
+
+    const ctx = canvas.getContext("2d");
+    ctx.strokeStyle = isErasing ? "white" : color;
+    ctx.lineWidth = isErasing ? eraserSize : brushSize;
+    ctx.lineCap = "round";
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => setIsDrawing(false);
+
+  // 🧠 Undo
+  const undo = (index) => {
+    const page = pages[index];
+    if (page.history.length === 0) return;
+
+    const last = page.history.pop();
+    page.redo.push(page.ref.current.toDataURL());
+
+    const img = new Image();
+    img.src = last;
+    img.onload = () => {
+      const ctx = page.ref.current.getContext("2d");
+      ctx.clearRect(0, 0, 595, 842);
+      ctx.drawImage(img, 0, 0);
+    };
+
+    setPages([...pages]);
+  };
+
+  // 🧠 Redo
+  const redo = (index) => {
+    const page = pages[index];
+    if (page.redo.length === 0) return;
+
+    const next = page.redo.pop();
+    page.history.push(page.ref.current.toDataURL());
+
+    const img = new Image();
+    img.src = next;
+    img.onload = () => {
+      const ctx = page.ref.current.getContext("2d");
+      ctx.clearRect(0, 0, 595, 842);
+      ctx.drawImage(img, 0, 0);
+    };
+
+    setPages([...pages]);
+  };
+
+  // ➕ Add page
+  const addPage = () => {
+    setPages([
+      ...pages,
+      { id: Date.now(), ref: React.createRef(), history: [], redo: [] }
+    ]);
+  };
+
+  // ➖ Remove page
+  const removePage = () => {
+    if (pages.length <= 1) return;
+    setPages(pages.slice(0, -1));
+  };
+
+  // 📄 Save PDF
   const saveAsPDF = () => {
     const pdf = new jsPDF("p", "mm", "a4");
 
-    pages.forEach((ref, index) => {
-      const canvas = ref.current;
-      const imgData = canvas.toDataURL("image/png");
-
-      if (index !== 0) pdf.addPage();
-
-      pdf.addImage(imgData, "PNG", 0, 0, 210, 297);
+    pages.forEach(({ ref }, i) => {
+      const img = ref.current.toDataURL("image/png");
+      if (i !== 0) pdf.addPage();
+      pdf.addImage(img, "PNG", 0, 0, 210, 297);
     });
 
     pdf.save("manga.pdf");
   };
 
   return (
-    <div
-      style={{
-        padding: "20px",
-        textAlign: "center",
-        color: "white"
-      }}
-    >
-      <h2>Draw Your Manga Pages 🎨</h2>
+    <div style={{ color: "white", padding: "20px", textAlign: "center" }}>
+      <h2>Draw Manga 🎨</h2>
 
       {/* Toolbar */}
-      <div style={{ marginBottom: "15px" }}>
+      <div>
         <input
           type="color"
           value={color}
@@ -84,44 +151,63 @@ const PaintPage = () => {
           }}
         />
 
-        <input
-          type="range"
-          min="1"
-          max="20"
-          value={brushSize}
-          onChange={(e) => setBrushSize(Number(e.target.value))}
-        />
+        <div>
+          Brush
+          <input
+            type="range"
+            min="1"
+            max="20"
+            value={brushSize}
+            onChange={(e) => setBrushSize(Number(e.target.value))}
+          />
+        </div>
 
-        <button onClick={clearCanvas}>Clear</button>
-
-        <button onClick={() => setIsErasing(true)}>
+        <div>
           Eraser
-        </button>
+          <input
+            type="range"
+            min="5"
+            max="50"
+            value={eraserSize}
+            onChange={(e) => setEraserSize(Number(e.target.value))}
+          />
+        </div>
 
+        <button onClick={() => setIsErasing(true)}>Eraser</button>
         <button onClick={saveAsPDF}>Save PDF</button>
       </div>
 
       {/* Pages */}
-      {pages.map((canvasRef, index) => (
-        <canvas
-          key={index}
-          ref={canvasRef}
-          width={595}
-          height={842} // A4 ratio
-          style={{
-            border: "2px solid white",
-            background: "white",
-            display: "block",
-            margin: "20px auto"
-          }}
-          onMouseDown={(e) => startDrawing(e, canvasRef)}
-          onMouseMove={(e) => draw(e, canvasRef)}
-          onMouseUp={stopDrawing}
-          onMouseLeave={stopDrawing}
-        />
+      {pages.map(({ ref, id }, index) => (
+        <div key={id}>
+          <div>
+            <button onClick={() => undo(index)}>Undo</button>
+            <button onClick={() => redo(index)}>Redo</button>
+          </div>
+
+          <canvas
+            ref={ref}
+            width={595}
+            height={842}
+            style={{
+              border: "2px solid white",
+              background: "white",
+              margin: "20px auto",
+              display: "block",
+              touchAction: "none"
+            }}
+            onMouseDown={(e) => startDrawing(e, ref, index)}
+            onMouseMove={(e) => draw(e, ref)}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            onTouchStart={(e) => startDrawing(e, ref, index)}
+            onTouchMove={(e) => draw(e, ref)}
+            onTouchEnd={stopDrawing}
+          />
+        </div>
       ))}
 
-      {/* ➕ Floating Add Page Button */}
+      {/* ➕ ➖ Buttons */}
       <button
         onClick={addPage}
         style={{
@@ -131,15 +217,25 @@ const PaintPage = () => {
           width: "60px",
           height: "60px",
           borderRadius: "50%",
-          backgroundColor: "#15aee1",
-          color: "white",
-          fontSize: "30px",
-          border: "none",
-          cursor: "pointer",
-          boxShadow: "0 4px 10px rgba(0,0,0,0.4)"
+          fontSize: "30px"
         }}
       >
         +
+      </button>
+
+      <button
+        onClick={removePage}
+        style={{
+          position: "fixed",
+          bottom: "90px",
+          right: "20px",
+          width: "60px",
+          height: "60px",
+          borderRadius: "50%",
+          fontSize: "30px"
+        }}
+      >
+        -
       </button>
     </div>
   );
