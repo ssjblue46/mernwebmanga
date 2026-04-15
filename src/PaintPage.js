@@ -11,8 +11,9 @@ const PaintPage = () => {
   const [brushSize, setBrushSize] = useState(3);
   const [eraserSize, setEraserSize] = useState(10);
   const [isErasing, setIsErasing] = useState(false);
+  const [dragIndex, setDragIndex] = useState(null);
 
-  // 🧠 Save state (for undo)
+  // 🧠 Save state
   const saveState = (ref, pageIndex) => {
     const canvas = ref.current;
     const data = canvas.toDataURL();
@@ -25,7 +26,7 @@ const PaintPage = () => {
     });
   };
 
-  // Start drawing (mouse + touch)
+  // 🎨 Start Drawing
   const startDrawing = (e, ref, index) => {
     const canvas = ref.current;
     const rect = canvas.getBoundingClientRect();
@@ -109,7 +110,7 @@ const PaintPage = () => {
     setPages([...pages]);
   };
 
-  // ➕ Add page
+  // ➕ Add Page
   const addPage = () => {
     setPages([
       ...pages,
@@ -117,10 +118,18 @@ const PaintPage = () => {
     ]);
   };
 
-  // ➖ Remove page
+  // ➖ Remove Page
   const removePage = () => {
     if (pages.length <= 1) return;
     setPages(pages.slice(0, -1));
+  };
+
+  // 🔀 Reorder Pages
+  const handleDrop = (index) => {
+    const updated = [...pages];
+    const dragged = updated.splice(dragIndex, 1)[0];
+    updated.splice(index, 0, dragged);
+    setPages(updated);
   };
 
   // 📄 Save PDF
@@ -136,119 +145,115 @@ const PaintPage = () => {
     pdf.save("manga.pdf");
   };
 
- return (
-  <div style={{ display: "flex", color: "white" }}>
+  return (
+    <div style={{ display: "flex", color: "white" }}>
 
-    {/* 📦 PAGE MANAGER (LEFT SIDE) */}
-    <div style={{
-      width: "120px",
-      borderRight: "2px solid #333",
-      padding: "10px",
-      textAlign: "center"
-    }}>
-      <h4>Pages</h4>
+      {/* 📦 Sidebar */}
+      <div style={{
+        width: "120px",
+        borderRight: "2px solid #333",
+        padding: "10px",
+        textAlign: "center"
+      }}>
+        <h4>Pages</h4>
 
-      {pages.map((page, index) => (
-        <div
-          key={page.id}
-          draggable
-          onDragStart={() => (window.dragIndex = index)}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={() => {
-            const updated = [...pages];
-            const dragged = updated.splice(window.dragIndex, 1)[0];
-            updated.splice(index, 0, dragged);
-            setPages(updated);
-          }}
-          style={{
-            margin: "10px 0",
-            padding: "10px",
-            background: "#15aee1",
-            borderRadius: "8px",
-            cursor: "grab",
-            fontWeight: "bold"
-          }}
-        >
-          {index + 1}
-        </div>
-      ))}
+        {pages.map((page, index) => (
+          <div
+            key={page.id}
+            draggable
+            onDragStart={() => setDragIndex(index)}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={() => handleDrop(index)}
+            style={{
+              margin: "10px 0",
+              padding: "10px",
+              background: "#15aee1",
+              borderRadius: "8px",
+              cursor: "grab",
+              fontWeight: "bold"
+            }}
+          >
+            {index + 1}
+          </div>
+        ))}
 
-      {/* ➕ ➖ inside panel */}
-      <button onClick={addPage} style={{ marginTop: "10px" }}>+</button>
-      <button onClick={removePage} style={{ marginTop: "5px" }}>-</button>
-    </div>
-
-    {/* 🎨 MAIN DRAW AREA */}
-    <div style={{ flex: 1, textAlign: "center", padding: "20px" }}>
-      <h2>Draw Manga 🎨</h2>
-
-      {/* Toolbar */}
-      <div>
-        <input
-          type="color"
-          value={color}
-          onChange={(e) => {
-            setColor(e.target.value);
-            setIsErasing(false);
-          }}
-        />
-
-        <div>
-          Brush
-          <input
-            type="range"
-            min="1"
-            max="20"
-            value={brushSize}
-            onChange={(e) => setBrushSize(Number(e.target.value))}
-          />
-        </div>
-
-        <div>
-          Eraser
-          <input
-            type="range"
-            min="5"
-            max="50"
-            value={eraserSize}
-            onChange={(e) => setEraserSize(Number(e.target.value))}
-          />
-        </div>
-
-        <button onClick={() => setIsErasing(true)}>Eraser</button>
-        <button onClick={saveAsPDF}>Save PDF</button>
+        <button onClick={addPage}>+</button>
+        <button onClick={removePage}>-</button>
       </div>
 
-      {/* Pages */}
-      {pages.map(({ ref, id }, index) => (
-        <div key={id}>
+      {/* 🎨 Main */}
+      <div style={{ flex: 1, textAlign: "center", padding: "20px" }}>
+        <h2>Draw Manga 🎨</h2>
+
+        {/* Toolbar */}
+        <div>
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => {
+              setColor(e.target.value);
+              setIsErasing(false);
+            }}
+          />
+
           <div>
-            <button onClick={() => undo(index)}>Undo</button>
-            <button onClick={() => redo(index)}>Redo</button>
+            Brush
+            <input
+              type="range"
+              min="1"
+              max="20"
+              value={brushSize}
+              onChange={(e) => setBrushSize(Number(e.target.value))}
+            />
           </div>
 
-          <canvas
-            ref={ref}
-            width={595}
-            height={842}
-            style={{
-              border: "2px solid white",
-              background: "white",
-              margin: "20px auto",
-              display: "block",
-              touchAction: "none"
-            }}
-            onMouseDown={(e) => startDrawing(e, ref, index)}
-            onMouseMove={(e) => draw(e, ref)}
-            onMouseUp={stopDrawing}
-            onMouseLeave={stopDrawing}
-            onTouchStart={(e) => startDrawing(e, ref, index)}
-            onTouchMove={(e) => draw(e, ref)}
-            onTouchEnd={stopDrawing}
-          />
+          <div>
+            Eraser
+            <input
+              type="range"
+              min="5"
+              max="50"
+              value={eraserSize}
+              onChange={(e) => setEraserSize(Number(e.target.value))}
+            />
+          </div>
+
+          <button onClick={() => setIsErasing(true)}>Eraser</button>
+          <button onClick={saveAsPDF}>Save PDF</button>
         </div>
-      ))}
+
+        {/* Canvas Pages */}
+        {pages.map(({ ref, id }, index) => (
+          <div key={id}>
+            <div>
+              <button onClick={() => undo(index)}>Undo</button>
+              <button onClick={() => redo(index)}>Redo</button>
+            </div>
+
+            <canvas
+              ref={ref}
+              width={595}
+              height={842}
+              style={{
+                border: "2px solid white",
+                background: "white",
+                margin: "20px auto",
+                display: "block",
+                touchAction: "none"
+              }}
+              onMouseDown={(e) => startDrawing(e, ref, index)}
+              onMouseMove={(e) => draw(e, ref)}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+              onTouchStart={(e) => startDrawing(e, ref, index)}
+              onTouchMove={(e) => draw(e, ref)}
+              onTouchEnd={stopDrawing}
+            />
+          </div>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
+
 export default PaintPage;
