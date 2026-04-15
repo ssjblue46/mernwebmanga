@@ -177,8 +177,35 @@ const PaintPage = () => {
           </div>
         ))}
 
-        <button onClick={addPage}>+</button>
-        <button onClick={removePage}>-</button>
+        <button
+    onClick={addPage}
+    style={{
+      width: "50px",
+      height: "50px",
+      fontSize: "28px",
+      borderRadius: "12px",
+      border: "none",
+      background: "#15aee1",
+      color: "white",
+      cursor: "pointer",
+      marginBottom: "10px",
+      boxShadow: "0 4px 10px rgba(0,0,0,0.4)"
+    }}
+  >+</button>
+        <button
+    onClick={removePage}
+    style={{
+      width: "50px",
+      height: "50px",
+      fontSize: "28px",
+      borderRadius: "12px",
+      border: "none",
+      background: "#ff4444",
+      color: "white",
+      cursor: "pointer",
+      boxShadow: "0 4px 10px rgba(0,0,0,0.4)"
+    }}
+  >-</button>
       </div>
 
       {/* 🎨 Main */}
