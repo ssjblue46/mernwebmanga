@@ -4,7 +4,34 @@
   padding: 0;
   box-sizing: border-box;
 }
+.avatar-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 15px;
+}
 
+.auth-avatar {
+  width: 100px;
+  height: 100px;
+
+  border-radius: 50%;          /* 🔥 circle */
+  object-fit: contain;         /* best for icon */
+
+  padding: 15px;               /* space inside circle */
+  background: #111;
+
+  border: 3px solid #15aee1;
+
+  box-shadow:
+    0 0 20px #15aee1,
+    0 0 40px rgba(21, 174, 225, 0.5);
+
+  transition: 0.3s;
+}
+
+.auth-avatar:hover {
+  transform: scale(1.08);
+}
 body {
   font-family: "Poppins", sans-serif;
   background: #0d0d0d;
