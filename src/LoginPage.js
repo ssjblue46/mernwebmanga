@@ -78,61 +78,105 @@ function LoginPage({ setMode, setLoggedIn, setUserRole, setUserEmail }) {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card login-card">
+    <div className="auth-card login-card">
 
-        <h1>Welcome to MangaVerse</h1>
+  <h1 className="auth-title">Welcome to MangaVerse</h1>
 
-        {/* ROLE SELECT */}
-        <div className="role-selector">
-          <button onClick={() => handleRoleChange("admin")}>
-            👑 Admin
-          </button>
-          <button onClick={() => handleRoleChange("creator")}>
-            ✍️ Creator
-          </button>
-          <button onClick={() => handleRoleChange("reader")}>
-            📖 Reader
+  {/* ROLE SELECT */}
+  <div className="role-selector">
+    <button
+      className={`role-btn ${selectedRole === "admin" ? "active" : ""}`}
+      onClick={() => handleRoleChange("admin")}
+    >
+      👑 <span>Admin</span>
+    </button>
+
+    <button
+      className={`role-btn ${selectedRole === "creator" ? "active" : ""}`}
+      onClick={() => handleRoleChange("creator")}
+    >
+      ✍️ <span>Creator</span>
+    </button>
+
+    <button
+      className={`role-btn ${selectedRole === "reader" ? "active" : ""}`}
+      onClick={() => handleRoleChange("reader")}
+    >
+      📖 <span>Reader</span>
+    </button>
+  </div>
+
+  {/* ERROR */}
+  {error && <div className="error-message">{error}</div>}
+
+  {/* LOGIN FORM */}
+  {(selectedRole === "admin" || selectedRole === "creator") && (
+    <div className="auth-form">
+
+      <div className="input-group">
+        <label>Email</label>
+        <input
+          type="email"
+          className="auth-input"
+          placeholder="Enter email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </div>
+
+      <div className="input-group">
+        <label>Password</label>
+        <div className="password-input-wrapper">
+          <input
+            type={showPassword ? "text" : "password"}
+            className="auth-input"
+            placeholder="Enter password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+
+          <button
+            type="button"
+            className="password-toggle"
+            onClick={() => setShowPassword(!showPassword)}
+          >
+            👁️
           </button>
         </div>
+      </div>
 
-        {/* ERROR */}
-        {error && <p style={{ color: "red" }}>{error}</p>}
+      <button
+        className="auth-button primary"
+        onClick={handleLogin}
+        disabled={loading}
+      >
+        {loading ? <div className="spinner"></div> : "Login"}
+      </button>
 
-        {/* LOGIN FORM */}
-        {(selectedRole === "admin" || selectedRole === "creator") && (
-          <>
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+    </div>
+  )}
 
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-
-            <button onClick={handleLogin} disabled={loading}>
-              {loading ? "Logging in..." : "Login"}
-            </button>
-          </>
-        )}
-
-        {/* READER */}
-        {selectedRole === "reader" && (
-          <p>You are logged in as Reader</p>
-        )}
-
-        <p onClick={() => setMode("signup")}>
-          Don't have an account? Sign Up
-        </p>
-
+  {/* READER */}
+  {selectedRole === "reader" && (
+    <div className="reader-info">
+      <div className="info-card">
+        <span className="info-icon">📖</span>
+        <h3>Reader Mode</h3>
+        <p>You can explore manga without logging in.</p>
       </div>
     </div>
+  )}
+
+  <div className="auth-footer">
+    <p>
+      Don't have an account?{" "}
+      <span className="auth-link" onClick={() => setMode("signup")}>
+        Sign Up
+      </span>
+    </p>
+  </div>
+
+</div>
   );
 }
 
