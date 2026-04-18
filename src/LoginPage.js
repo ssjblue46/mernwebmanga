@@ -89,7 +89,7 @@ function LoginPage({ setMode, setLoggedIn, setUserRole, setUserEmail }) {
       />
     </div>
   <h1 className="auth-title">Welcome to MangaVerse</h1>
-
+          </div>
   {/* ROLE SELECT */}
   <div className="role-selector">
     <button
