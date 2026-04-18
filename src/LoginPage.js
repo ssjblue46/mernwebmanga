@@ -79,7 +79,15 @@ function LoginPage({ setMode, setLoggedIn, setUserRole, setUserEmail }) {
 
   return (
     <div className="auth-card login-card">
+    <div className="auth-header">
 
+    <div className="avatar-container">
+      <img
+        src="/user.png"
+        alt="logo"
+        className="auth-avatar"
+      />
+    </div>
   <h1 className="auth-title">Welcome to MangaVerse</h1>
 
   {/* ROLE SELECT */}
