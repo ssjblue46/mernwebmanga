@@ -298,8 +298,13 @@ const brushPresets = {
               type="range"
               min="1"
               max="20"
-              value={brushSize}
-              onChange={(e) => setBrushSize(Number(e.target.value))}
+              value={currentBrush.size}
+              onChange={(e) =>
+  setCurrentBrush({
+    ...currentBrush,
+    size: Number(e.target.value)
+  })
+}
             />
           </div>
 
