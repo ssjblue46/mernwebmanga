@@ -170,36 +170,7 @@ const brushPresets = {
   ctx.stroke();
 };
 
-  // 🎨 Effects
-  if (currentBrush.effect === "rainbow") {
-    ctx.strokeStyle = `hsl(${Date.now() % 360}, 100%, 50%)`;
-  } else {
-    ctx.strokeStyle = color;
-  }
 
-  if (currentBrush.effect === "dotted") {
-    ctx.setLineDash([5, 5]);
-  } else {
-    ctx.setLineDash([]);
-  }
-
-  if (currentBrush.effect === "spray") {
-    for (let i = 0; i < 10; i++) {
-      const offsetX = Math.random() * currentBrush.size - currentBrush.size / 2;
-      const offsetY = Math.random() * currentBrush.size - currentBrush.size / 2;
-      ctx.fillRect(x + offsetX, y + offsetY, 1, 1);
-    }
-    return;
-  }
-
-  if (currentBrush.effect === "calligraphy") {
-    ctx.lineWidth = currentBrush.size;
-    ctx.lineCap = "square";
-  }
-
-  ctx.lineTo(x, y);
-  ctx.stroke();
-};
   const stopDrawing = () => setIsDrawing(false);
 
   // 🧠 Undo
