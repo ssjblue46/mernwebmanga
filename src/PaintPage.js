@@ -156,50 +156,52 @@ const PaintPage = () => {
   };
 
   // 📥 Upload PDF (MAIN FEATURE)
-  const handlePDFUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+const handlePDFUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
 
-    const reader = new FileReader();
+  const reader = new FileReader();
 
-    reader.onload = async function () {
-      const typedArray = new Uint8Array(this.result);
-      const pdf = await pdfjsLib.getDocument(typedArray).promise;
+  reader.onload = async function () {
+    const typedArray = new Uint8Array(this.result);
 
-      const newPages = [];
+    const pdf = await pdfjsLib.getDocument(typedArray).promise;
 
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 2 });
+    const newPages = [];
 
-        const tempCanvas = document.createElement("canvas");
-        const ctx = tempCanvas.getContext("2d");
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
 
-        tempCanvas.width = 595;
-        tempCanvas.height = 842;
+      const viewport = page.getViewport({ scale: 2 });
 
-        await page.render({
-          canvasContext: ctx,
-          viewport: viewport
-        }).promise;
+      const tempCanvas = document.createElement("canvas");
+      const ctx = tempCanvas.getContext("2d");
 
-        const imgData = tempCanvas.toDataURL();
+      tempCanvas.width = viewport.width;
+      tempCanvas.height = viewport.height;
 
-        newPages.push({
-          id: Date.now() + i,
-          ref: React.createRef(),
-          history: [],
-          redo: [],
-          imgData,
-          initialized: false
-        });
-      }
+      await page.render({
+        canvasContext: ctx,
+        viewport: viewport
+      }).promise;
 
-      setPages(newPages);
-    };
+      const imgData = tempCanvas.toDataURL("image/png");
 
-    reader.readAsArrayBuffer(file);
+      newPages.push({
+        id: Date.now() + i,
+        ref: React.createRef(),
+        history: [],
+        redo: [],
+        imgData,
+        initialized: false
+      });
+    }
+
+    setPages(newPages);
   };
+
+  reader.readAsArrayBuffer(file);
+};
 
   return (
     <div style={{ display: "flex", color: "white" }}>
@@ -266,26 +268,40 @@ const PaintPage = () => {
             <button onClick={() => redo(index)}>Redo</button>
 
             <canvas
-              ref={(canvas) => {
-                if (!canvas) return;
-                page.ref.current = canvas;
+  ref={(canvas) => {
+    if (!canvas) return;
 
-                if (page.imgData && !page.initialized) {
-                  const ctx = canvas.getContext("2d");
-                  const img = new Image();
+    const page = pages[index];
+    if (!page) return;
 
-                  img.src = page.imgData;
-                  img.onload = () => {
-                    ctx.drawImage(img, 0, 0, 595, 842);
+    page.ref.current = canvas;
 
-                    // 🔥 Save as base state
-                    const base = canvas.toDataURL();
-                    page.history.push(base);
+    if (page.imgData && !page.initialized) {
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
 
-                    page.initialized = true;
-                  };
-                }
-              }}
+      img.src = page.imgData;
+
+      img.onload = () => {
+        // 🔥 SCALE IMAGE TO FIT CANVAS
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.drawImage(
+          img,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        // 🧠 Save as base state (so it's erasable)
+        const base = canvas.toDataURL();
+        page.history.push(base);
+
+        page.initialized = true;
+      };
+    }
+  }}
               width={595}
               height={842}
               style={{ border: "2px solid white", background: "white", margin: "20px auto" }}
