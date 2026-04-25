@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { jsPDF } from "jspdf";
 import * as pdfjsLib from "pdfjs-dist";
-import "pdfjs-dist/build/pdf.worker.entry";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 const PaintPage = () => {
   const [pages, setPages] = useState([
