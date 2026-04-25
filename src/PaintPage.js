@@ -245,16 +245,26 @@ const PaintPage = () => {
             />
           </div>
 
-          <button onClick={() => setIsErasing(true)}>Eraser</button>
-          <button onClick={saveAsPDF}>Save PDF</button>
+          <button className="nav-style-btn" onClick={() => setIsErasing(true)}>
+  🧽 Eraser
+</button>
+
+<button className="nav-style-btn" onClick={saveAsPDF}>
+  📄 Save PDF
+</button>
         </div>
 
         {/* Canvas Pages */}
         {pages.map(({ ref, id }, index) => (
           <div key={id}>
             <div>
-              <button onClick={() => undo(index)}>Undo</button>
-              <button onClick={() => redo(index)}>Redo</button>
+              <button className="nav-style-btn" onClick={() => undo(index)}>
+  ↩ Undo
+</button>
+
+<button className="nav-style-btn" onClick={() => redo(index)}>
+  ↪ Redo
+</button>
             </div>
 
             <canvas
