@@ -23,7 +23,7 @@ const brushPresets = {
     name: "Marker",
     size: 8,
     opacity: 0.4,
-    effect: "normal"
+    effect: "marker"
   },
   spray: {
     name: "Spray",
@@ -51,6 +51,7 @@ const brushPresets = {
   }
 };
   const [currentBrush, setCurrentBrush] = useState(brushPresets.pencil);
+  const [hue, setHue] = useState(0);
   // 🧠 Save state
   const saveState = (ref, pageIndex) => {
     const canvas = ref.current;
@@ -107,7 +108,67 @@ const brushPresets = {
 
   ctx.lineWidth = isErasing ? eraserSize : currentBrush.size;
   ctx.lineCap = "round";
+  ctx.lineJoin = "round";
   ctx.globalAlpha = currentBrush.opacity;
+
+  // RESET things each frame
+  ctx.shadowBlur = 0;
+  ctx.setLineDash([]);
+
+  // 🎨 EFFECTS
+  switch (currentBrush.effect) {
+
+    // ✏️ Pencil
+    case "normal":
+      ctx.strokeStyle = color;
+      break;
+
+    // 🖊 Marker (thick + smooth)
+    case "marker":
+      ctx.strokeStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = currentBrush.size / 2;
+      break;
+
+    // ✒️ Calligraphy (angled stroke)
+    case "calligraphy":
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.PI / 6);
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, currentBrush.size, 2);
+      ctx.restore();
+      return;
+
+    // ⚫ Dotted
+    case "dotted":
+      ctx.strokeStyle = color;
+      ctx.setLineDash([currentBrush.size * 2, currentBrush.size * 2]);
+      break;
+
+    // 🌈 Rainbow (FIXED)
+    case "rainbow":
+      ctx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
+      setHue((prev) => (prev + 2) % 360);
+      break;
+
+    // 💨 Spray
+    case "spray":
+      ctx.fillStyle = color;
+      for (let i = 0; i < currentBrush.size * 2; i++) {
+        const offsetX = Math.random() * currentBrush.size - currentBrush.size / 2;
+        const offsetY = Math.random() * currentBrush.size - currentBrush.size / 2;
+        ctx.fillRect(x + offsetX, y + offsetY, 1, 1);
+      }
+      return;
+
+    default:
+      ctx.strokeStyle = color;
+  }
+
+  ctx.lineTo(x, y);
+  ctx.stroke();
+};
 
   // 🎨 Effects
   if (currentBrush.effect === "rainbow") {
