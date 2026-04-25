@@ -32,7 +32,7 @@ const PaintPage = () => {
     img.onload = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
 
       // Save as base (so erasable + undo works)
       const base = canvas.toDataURL();
@@ -218,13 +218,15 @@ const handlePDFUpload = async (e) => {
       const imgData = tempCanvas.toDataURL("image/png");
 
       newPages.push({
-        id: Date.now() + i,
-        ref: React.createRef(),
-        history: [],
-        redo: [],
-        imgData,
-        initialized: false
-      });
+  id: Date.now() + i,
+  ref: React.createRef(),
+  history: [],
+  redo: [],
+  imgData,
+  width: viewport.width,
+  height: viewport.height,
+  initialized: false
+});
     }
 
     setPages(newPages);
@@ -299,8 +301,8 @@ const handlePDFUpload = async (e) => {
 
             <canvas
   ref={page.ref}
-  width={595}
-  height={842}
+  width={page.width || 595}
+  height={page.height || 842}
   style={{
     border: "2px solid white",
     background: "white",
