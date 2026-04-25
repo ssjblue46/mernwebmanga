@@ -12,7 +12,45 @@ const PaintPage = () => {
   const [eraserSize, setEraserSize] = useState(10);
   const [isErasing, setIsErasing] = useState(false);
   const [dragIndex, setDragIndex] = useState(null);
-
+const brushPresets = {
+  pencil: {
+    name: "Pencil",
+    size: 2,
+    opacity: 1,
+    effect: "normal"
+  },
+  marker: {
+    name: "Marker",
+    size: 8,
+    opacity: 0.4,
+    effect: "normal"
+  },
+  spray: {
+    name: "Spray",
+    size: 10,
+    opacity: 0.3,
+    effect: "spray"
+  },
+  calligraphy: {
+    name: "Calligraphy",
+    size: 6,
+    opacity: 1,
+    effect: "calligraphy"
+  },
+  dotted: {
+    name: "Dotted",
+    size: 4,
+    opacity: 1,
+    effect: "dotted"
+  },
+  rainbow: {
+    name: "Rainbow",
+    size: 5,
+    opacity: 1,
+    effect: "rainbow"
+  }
+};
+  const [currentBrush, setCurrentBrush] = useState(brushPresets.pencil);
   // 🧠 Save state
   const saveState = (ref, pageIndex) => {
     const canvas = ref.current;
@@ -48,28 +86,59 @@ const PaintPage = () => {
   };
 
   const draw = (e, ref) => {
-    if (!isDrawing) return;
+  if (!isDrawing) return;
 
-    const canvas = ref.current;
-    const rect = canvas.getBoundingClientRect();
+  const canvas = ref.current;
+  const rect = canvas.getBoundingClientRect();
 
-    const x = e.touches
-      ? e.touches[0].clientX - rect.left
-      : e.nativeEvent.offsetX;
+  const x = e.touches
+    ? e.touches[0].clientX - rect.left
+    : e.nativeEvent.offsetX;
 
-    const y = e.touches
-      ? e.touches[0].clientY - rect.top
-      : e.nativeEvent.offsetY;
+  const y = e.touches
+    ? e.touches[0].clientY - rect.top
+    : e.nativeEvent.offsetY;
 
-    const ctx = canvas.getContext("2d");
-    ctx.strokeStyle = isErasing ? "white" : color;
-    ctx.lineWidth = isErasing ? eraserSize : brushSize;
-    ctx.lineCap = "round";
+  const ctx = canvas.getContext("2d");
 
-    ctx.lineTo(x, y);
-    ctx.stroke();
-  };
+  ctx.globalCompositeOperation = isErasing
+    ? "destination-out"
+    : "source-over";
 
+  ctx.lineWidth = isErasing ? eraserSize : currentBrush.size;
+  ctx.lineCap = "round";
+  ctx.globalAlpha = currentBrush.opacity;
+
+  // 🎨 Effects
+  if (currentBrush.effect === "rainbow") {
+    ctx.strokeStyle = `hsl(${Date.now() % 360}, 100%, 50%)`;
+  } else {
+    ctx.strokeStyle = color;
+  }
+
+  if (currentBrush.effect === "dotted") {
+    ctx.setLineDash([5, 5]);
+  } else {
+    ctx.setLineDash([]);
+  }
+
+  if (currentBrush.effect === "spray") {
+    for (let i = 0; i < 10; i++) {
+      const offsetX = Math.random() * currentBrush.size - currentBrush.size / 2;
+      const offsetY = Math.random() * currentBrush.size - currentBrush.size / 2;
+      ctx.fillRect(x + offsetX, y + offsetY, 1, 1);
+    }
+    return;
+  }
+
+  if (currentBrush.effect === "calligraphy") {
+    ctx.lineWidth = currentBrush.size;
+    ctx.lineCap = "square";
+  }
+
+  ctx.lineTo(x, y);
+  ctx.stroke();
+};
   const stopDrawing = () => setIsDrawing(false);
 
   // 🧠 Undo
@@ -247,6 +316,19 @@ const PaintPage = () => {
 
           <button className="nav-style-btn" onClick={() => setIsErasing(false)}> 🖌 Brush </button>
           <button className="nav-style-btn" onClick={() => setIsErasing(true)}>🧽 Eraser </button>
+                <div>
+  {Object.keys(brushPresets).map((key) => (
+    <button
+      key={key}
+      onClick={() => {
+        setCurrentBrush(brushPresets[key]);
+        setIsErasing(false);
+      }}
+    >
+      {brushPresets[key].name}
+    </button>
+  ))}
+</div>
           <button className="nav-style-btn" onClick={saveAsPDF}>📄 Save PDF </button>
         </div>
 
