@@ -245,13 +245,9 @@ const PaintPage = () => {
             />
           </div>
 
-          <button className="nav-style-btn" onClick={() => setIsErasing(true)}>
-  🧽 Eraser
-</button>
-
-<button className="nav-style-btn" onClick={saveAsPDF}>
-  📄 Save PDF
-</button>
+          <button className="nav-style-btn" onClick={() => setIsErasing(false)}> 🖌 Brush </button>
+          <button className="nav-style-btn" onClick={() => setIsErasing(true)}>🧽 Eraser </button> </br>
+          <button className="nav-style-btn" onClick={saveAsPDF}>📄 Save PDF </button>
         </div>
 
         {/* Canvas Pages */}
