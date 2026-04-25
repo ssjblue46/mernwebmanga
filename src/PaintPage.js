@@ -83,6 +83,8 @@ const brushPresets = {
     const ctx = canvas.getContext("2d");
     ctx.beginPath();
     ctx.moveTo(x, y);
+    ctx.lastX = x;
+    ctx.lastY = y;
     setIsDrawing(true);
   };
 
@@ -111,63 +113,72 @@ const brushPresets = {
   ctx.lineJoin = "round";
   ctx.globalAlpha = currentBrush.opacity;
 
-  // RESET things each frame
-  ctx.shadowBlur = 0;
-  ctx.setLineDash([]);
+  // 🔥 RAINBOW GRADIENT (THIS FIXES YOUR ISSUE)
+  if (currentBrush.effect === "rainbow") {
+    const lastX = ctx.lastX || x;
+    const lastY = ctx.lastY || y;
 
-  // 🎨 EFFECTS
-  switch (currentBrush.effect) {
+    const gradient = ctx.createLinearGradient(lastX, lastY, x, y);
+    gradient.addColorStop(0, `hsl(${hue}, 100%, 50%)`);
+    gradient.addColorStop(1, `hsl(${(hue + 20) % 360}, 100%, 50%)`);
 
-    // ✏️ Pencil
-    case "normal":
-      ctx.strokeStyle = color;
-      break;
+    ctx.strokeStyle = gradient;
 
-    // 🖊 Marker (thick + smooth)
-    case "marker":
-      ctx.strokeStyle = color;
-      ctx.shadowColor = color;
-      ctx.shadowBlur = currentBrush.size / 2;
-      break;
+    setHue((prev) => (prev + 4) % 360);
 
-    // ✒️ Calligraphy (angled stroke)
-    case "calligraphy":
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(Math.PI / 6);
-      ctx.fillStyle = color;
-      ctx.fillRect(0, 0, currentBrush.size, 2);
-      ctx.restore();
-      return;
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
 
-    // ⚫ Dotted
-    case "dotted":
-      ctx.strokeStyle = color;
-      ctx.setLineDash([currentBrush.size * 2, currentBrush.size * 2]);
-      break;
+    ctx.lastX = x;
+    ctx.lastY = y;
+    return;
+  }
 
-    // 🌈 Rainbow (FIXED)
-    case "rainbow":
-      ctx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
-      setHue((prev) => (prev + 2) % 360);
-      break;
+  // ✏️ Normal / Marker / Dotted
+  ctx.strokeStyle = color;
 
-    // 💨 Spray
-    case "spray":
-      ctx.fillStyle = color;
-      for (let i = 0; i < currentBrush.size * 2; i++) {
-        const offsetX = Math.random() * currentBrush.size - currentBrush.size / 2;
-        const offsetY = Math.random() * currentBrush.size - currentBrush.size / 2;
-        ctx.fillRect(x + offsetX, y + offsetY, 1, 1);
-      }
-      return;
+  if (currentBrush.effect === "marker") {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = currentBrush.size / 2;
+  } else {
+    ctx.shadowBlur = 0;
+  }
 
-    default:
-      ctx.strokeStyle = color;
+  if (currentBrush.effect === "dotted") {
+    ctx.setLineDash([currentBrush.size * 2, currentBrush.size * 3]);
+  } else {
+    ctx.setLineDash([]);
+  }
+
+  // ✒️ Calligraphy (FIXED)
+  if (currentBrush.effect === "calligraphy") {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.PI / 6);
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, currentBrush.size, 2);
+    ctx.restore();
+    return;
+  }
+
+  // 💨 Spray
+  if (currentBrush.effect === "spray") {
+    ctx.fillStyle = color;
+    for (let i = 0; i < currentBrush.size * 2; i++) {
+      const offsetX = Math.random() * currentBrush.size - currentBrush.size / 2;
+      const offsetY = Math.random() * currentBrush.size - currentBrush.size / 2;
+      ctx.fillRect(x + offsetX, y + offsetY, 1, 1);
+    }
+    return;
   }
 
   ctx.lineTo(x, y);
   ctx.stroke();
+
+  ctx.lastX = x;
+  ctx.lastY = y;
 };
 
 
