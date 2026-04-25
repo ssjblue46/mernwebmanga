@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { jsPDF } from "jspdf";
 import * as pdfjsLib from "pdfjs-dist";
 
@@ -17,6 +18,36 @@ const PaintPage = () => {
   const [isErasing, setIsErasing] = useState(false);
   const [dragIndex, setDragIndex] = useState(null);
 
+  useEffect(() => {
+  pages.forEach((page, index) => {
+    if (!page.ref.current) return;
+    if (!page.imgData) return;
+    if (page.initialized) return;
+
+    const canvas = page.ref.current;
+    const ctx = canvas.getContext("2d");
+
+    const img = new Image();
+    img.src = page.imgData;
+
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // Save as base (so erasable + undo works)
+      const base = canvas.toDataURL();
+
+      setPages((prev) => {
+        const updated = [...prev];
+        updated[index].history.push(base);
+        updated[index].initialized = true;
+        return updated;
+      });
+    };
+  });
+}, [pages]);
+  
   // 🧠 Save state
   const saveState = (ref, pageIndex) => {
     const canvas = ref.current;
@@ -268,48 +299,21 @@ const handlePDFUpload = async (e) => {
             <button onClick={() => redo(index)}>Redo</button>
 
             <canvas
-  ref={(canvas) => {
-    if (!canvas) return;
-
-    const page = pages[index];
-    if (!page) return;
-
-    page.ref.current = canvas;
-
-    if (page.imgData && !page.initialized) {
-      const ctx = canvas.getContext("2d");
-      const img = new Image();
-
-      img.src = page.imgData;
-
-      img.onload = () => {
-        // 🔥 SCALE IMAGE TO FIT CANVAS
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        ctx.drawImage(
-          img,
-          0,
-          0,
-          canvas.width,
-          canvas.height
-        );
-
-        // 🧠 Save as base state (so it's erasable)
-        const base = canvas.toDataURL();
-        page.history.push(base);
-
-        page.initialized = true;
-      };
-    }
+  ref={page.ref}
+  width={595}
+  height={842}
+  style={{
+    border: "2px solid white",
+    background: "white",
+    margin: "20px auto",
+    display: "block"
   }}
-              width={595}
-              height={842}
-              style={{ border: "2px solid white", background: "white", margin: "20px auto" }}
-              onMouseDown={(e) => startDrawing(e, page.ref, index)}
-              onMouseMove={(e) => draw(e, page.ref)}
-              onMouseUp={stopDrawing}
-              onMouseLeave={stopDrawing}
-            />
+  onMouseDown={(e) => startDrawing(e, page.ref, index)}
+  onMouseMove={(e) => draw(e, page.ref)}
+  onMouseUp={stopDrawing}
+  onMouseLeave={stopDrawing}
+/>
+
           </div>
         ))}
       </div>
