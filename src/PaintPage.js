@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { jsPDF } from "jspdf";
+import * as pdfjsLib from "pdfjs-dist";
+import "pdfjs-dist/build/pdf.worker.entry";
 
 const PaintPage = () => {
   const [pages, setPages] = useState([
@@ -62,7 +64,13 @@ const PaintPage = () => {
       : e.nativeEvent.offsetY;
 
     const ctx = canvas.getContext("2d");
-    ctx.strokeStyle = isErasing ? "white" : color;
+
+    // 🔥 REAL ERASER
+    ctx.globalCompositeOperation = isErasing
+      ? "destination-out"
+      : "source-over";
+
+    ctx.strokeStyle = color;
     ctx.lineWidth = isErasing ? eraserSize : brushSize;
     ctx.lineCap = "round";
 
@@ -85,7 +93,7 @@ const PaintPage = () => {
     img.onload = () => {
       const ctx = page.ref.current.getContext("2d");
       ctx.clearRect(0, 0, 595, 842);
-      ctx.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0, 595, 842);
     };
 
     setPages([...pages]);
@@ -104,7 +112,7 @@ const PaintPage = () => {
     img.onload = () => {
       const ctx = page.ref.current.getContext("2d");
       ctx.clearRect(0, 0, 595, 842);
-      ctx.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0, 595, 842);
     };
 
     setPages([...pages]);
@@ -145,9 +153,55 @@ const PaintPage = () => {
     pdf.save("manga.pdf");
   };
 
+  // 📥 Upload PDF (MAIN FEATURE)
+  const handlePDFUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = async function () {
+      const typedArray = new Uint8Array(this.result);
+      const pdf = await pdfjsLib.getDocument(typedArray).promise;
+
+      const newPages = [];
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 2 });
+
+        const tempCanvas = document.createElement("canvas");
+        const ctx = tempCanvas.getContext("2d");
+
+        tempCanvas.width = 595;
+        tempCanvas.height = 842;
+
+        await page.render({
+          canvasContext: ctx,
+          viewport: viewport
+        }).promise;
+
+        const imgData = tempCanvas.toDataURL();
+
+        newPages.push({
+          id: Date.now() + i,
+          ref: React.createRef(),
+          history: [],
+          redo: [],
+          imgData,
+          initialized: false
+        });
+      }
+
+      setPages(newPages);
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
   return (
     <div style={{ display: "flex", color: "white" }}>
-
+      
       {/* 📦 Sidebar */}
       <div style={{
         width: "120px",
@@ -177,35 +231,8 @@ const PaintPage = () => {
           </div>
         ))}
 
-        <button
-    onClick={addPage}
-    style={{
-      width: "50px",
-      height: "50px",
-      fontSize: "28px",
-      borderRadius: "12px",
-      border: "none",
-      background: "#15aee1",
-      color: "white",
-      cursor: "pointer",
-      marginBottom: "10px",
-      boxShadow: "0 4px 10px rgba(0,0,0,0.4)"
-    }}
-  >+</button>
-        <button
-    onClick={removePage}
-    style={{
-      width: "50px",
-      height: "50px",
-      fontSize: "28px",
-      borderRadius: "12px",
-      border: "none",
-      background: "#ff4444",
-      color: "white",
-      cursor: "pointer",
-      boxShadow: "0 4px 10px rgba(0,0,0,0.4)"
-    }}
-  >-</button>
+        <button onClick={addPage}>+</button>
+        <button onClick={removePage}>-</button>
       </div>
 
       {/* 🎨 Main */}
@@ -214,6 +241,8 @@ const PaintPage = () => {
 
         {/* Toolbar */}
         <div>
+          <input type="file" accept="application/pdf" onChange={handlePDFUpload} />
+
           <input
             type="color"
             value={color}
@@ -223,64 +252,45 @@ const PaintPage = () => {
             }}
           />
 
-          <div>
-            Brush
-            <input
-              type="range"
-              min="1"
-              max="20"
-              value={brushSize}
-              onChange={(e) => setBrushSize(Number(e.target.value))}
-            />
-          </div>
-
-          <div>
-            Eraser
-            <input
-              type="range"
-              min="5"
-              max="50"
-              value={eraserSize}
-              onChange={(e) => setEraserSize(Number(e.target.value))}
-            />
-          </div>
-
-          <button className="nav-style-btn" onClick={() => setIsErasing(false)}> 🖌 Brush </button>
-          <button className="nav-style-btn" onClick={() => setIsErasing(true)}>🧽 Eraser </button> <br />
-          <button className="nav-style-btn" onClick={saveAsPDF}>📄 Save PDF </button>
+          <button onClick={() => setIsErasing(false)}>🖌 Brush</button>
+          <button onClick={() => setIsErasing(true)}>🧽 Eraser</button>
+          <button onClick={saveAsPDF}>📄 Save PDF</button>
         </div>
 
-        {/* Canvas Pages */}
-        {pages.map(({ ref, id }, index) => (
-          <div key={id}>
-            <div>
-              <button className="nav-style-btn" onClick={() => undo(index)}>
-  ↩ Undo
-</button>
-
-<button className="nav-style-btn" onClick={() => redo(index)}>
-  ↪ Redo
-</button>
-            </div>
+        {/* Canvas */}
+        {pages.map((page, index) => (
+          <div key={page.id}>
+            <button onClick={() => undo(index)}>Undo</button>
+            <button onClick={() => redo(index)}>Redo</button>
 
             <canvas
-              ref={ref}
+              ref={(canvas) => {
+                if (!canvas) return;
+                page.ref.current = canvas;
+
+                if (page.imgData && !page.initialized) {
+                  const ctx = canvas.getContext("2d");
+                  const img = new Image();
+
+                  img.src = page.imgData;
+                  img.onload = () => {
+                    ctx.drawImage(img, 0, 0, 595, 842);
+
+                    // 🔥 Save as base state
+                    const base = canvas.toDataURL();
+                    page.history.push(base);
+
+                    page.initialized = true;
+                  };
+                }
+              }}
               width={595}
               height={842}
-              style={{
-                border: "2px solid white",
-                background: "white",
-                margin: "20px auto",
-                display: "block",
-                touchAction: "none"
-              }}
-              onMouseDown={(e) => startDrawing(e, ref, index)}
-              onMouseMove={(e) => draw(e, ref)}
+              style={{ border: "2px solid white", background: "white", margin: "20px auto" }}
+              onMouseDown={(e) => startDrawing(e, page.ref, index)}
+              onMouseMove={(e) => draw(e, page.ref)}
               onMouseUp={stopDrawing}
               onMouseLeave={stopDrawing}
-              onTouchStart={(e) => startDrawing(e, ref, index)}
-              onTouchMove={(e) => draw(e, ref)}
-              onTouchEnd={stopDrawing}
             />
           </div>
         ))}
