@@ -1,4 +1,3 @@
-import React, { useState } from "react";
 import React, { useState, useEffect } from "react";
 import { jsPDF } from "jspdf";
 import * as pdfjsLib from "pdfjs-dist";
