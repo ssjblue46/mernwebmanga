@@ -103,7 +103,10 @@ const brushPresets = {
     : e.nativeEvent.offsetY;
 
   const ctx = canvas.getContext("2d");
-
+  ctx.setLineDash([]);
+ctx.shadowBlur = 0;
+ctx.shadowColor = "transparent";
+ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalCompositeOperation = isErasing
     ? "destination-out"
     : "source-over";
@@ -115,6 +118,10 @@ const brushPresets = {
 
   // 🔥 RAINBOW GRADIENT (THIS FIXES YOUR ISSUE)
   if (currentBrush.effect === "rainbow") {
+    ctx.setLineDash([]);
+ctx.shadowBlur = 0;
+ctx.shadowColor = "transparent";
+ctx.setTransform(1, 0, 0, 1, 0, 0);
     const lastX = ctx.lastX || x;
     const lastY = ctx.lastY || y;
 
