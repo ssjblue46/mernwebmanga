@@ -16,18 +16,25 @@ const MONGO_URI =
 const JWT_SECRET = "demo_secret_key"; // (as you said, keeping this)
 
 // ===== MIDDLEWARE =====
-app.use(cors());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // ===== AUTH MIDDLEWARE =====
 const authMiddleware = (req, res, next) => {
+  console.log("HEADERS:", req.headers.authorization); // 👈 ADD THIS
+
   const token = req.headers.authorization?.split(" ")[1];
+
   if (!token) return res.status(401).json({ message: "No token" });
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded; // { id, email }
+    req.user = decoded;
     next();
   } catch {
     res.status(401).json({ message: "Invalid token" });
