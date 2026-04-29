@@ -41,7 +41,7 @@ function Home({ pdfs, setPdfs }) {
          
         method: "POST",
          headers: {
-    Authorization: `Bearer ${localStorage.getItem("token")}` // ✅ ADD THIS
+    Authorization: `Bearer ${localStorage.getItem("userToken")}` // ✅ ADD THIS
   },
         body: formData,
       });
@@ -77,7 +77,7 @@ const handleDelete = async (id) => {
     const res = await fetch(`${BASE_URL}/api/pdfs/${id}`, {
       method: "DELETE",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`
+        Authorization: `Bearer ${localStorage.getItem("userToken")}`
       }
     });
 
