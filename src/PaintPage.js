@@ -374,7 +374,7 @@ ctx.setTransform(1, 0, 0, 1, 0, 0);
                 <div>
   {Object.keys(brushPresets).map((key) => (
     <button
-      key={key}
+      key={key} className="nav-style-btn"
       onClick={() => {
         setCurrentBrush(brushPresets[key]);
         setIsErasing(false);
