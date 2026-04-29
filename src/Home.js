@@ -123,23 +123,7 @@ const handleDelete = async (id) => {
     🔒 Only creators/admin can upload PDFs
   </p>
 )}
-  {(userRole === "admin" || userRole === "creator") && (
-  <button
-    onClick={() => handleDelete(pdf._id)}
-      style={{
-        background: loading ? "#555" : "#1c1c1c",
-        color: "#fff",
-        borderRadius: "30px",
-        padding: "12px 25px",
-        fontWeight: "bold",
-        border: "1px solid #333",
-        cursor: loading ? "not-allowed" : "pointer",
-        fontSize: "16px",
-    }}
-  >
-    🗑 Delete
-  </button>
-)}
+ 
       <h2>📁 Manga Collection (PDF)</h2>
 
       <div className="pdf-grid">
@@ -166,6 +150,22 @@ const handleDelete = async (id) => {
             >
               🔎 Open PDF
             </a>
+                {(userRole === "admin" || userRole === "creator") && (
+  <button
+    onClick={() => handleDelete(pdf._id)}
+    style={{
+      marginTop: "8px",
+      background: "red",
+      color: "white",
+      border: "none",
+      padding: "6px 10px",
+      borderRadius: "6px",
+      cursor: "pointer"
+    }}
+  >
+    🗑 Delete
+  </button>
+)}
           </div>
         ))}
       </div>
