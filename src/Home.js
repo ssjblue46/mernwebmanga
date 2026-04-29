@@ -26,44 +26,47 @@ function Home({ pdfs, setPdfs }) {
   }, [setPdfs]);
 
   // Upload PDFs
-  const handleUpload = async (e) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+const handleUpload = async (e) => {
+  const token = localStorage.getItem("userToken");
+  if (!token) {
+    alert("Please login first");
+    return;
+  }
 
-    setLoading(true); // Start loading
-    const formData = new FormData();
-    for (let i = 0; i < files.length; i++) {
-      formData.append("pdfs", files[i]);
+  const files = e.target.files;
+  if (!files?.length) return;
+
+  setLoading(true);
+
+  const formData = new FormData();
+  for (let f of files) formData.append("pdfs", f);
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/pdfs`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      body: formData,
+    });
+
+    if (res.status === 401) {
+      alert("Session expired. Login again.");
+      return;
     }
 
-    try {
-      const res = await fetch(`${BASE_URL}/api/pdfs`, {
-         
-        method: "POST",
-         headers: {
-    Authorization: `Bearer ${localStorage.getItem("userToken")}` // ✅ ADD THIS
-  },
-        body: formData,
-      });
+    if (!res.ok) throw new Error();
 
-      if (!res.ok) throw new Error("Upload failed");
+    const data = await res.json();
+    setPdfs(prev => [...prev, ...data]);
 
-      const data = await res.json();
-      const newPdfs = Array.isArray(data) ? data : (data.pdfs || []);
-
-      // If backend returns only new files, append them. 
-      // If it returns the FULL list, use: setPdfs(newPdfs);
-      setPdfs((prev) => [...prev, ...newPdfs]);
-
-      alert("Upload successful ✅");
-    } catch (err) {
-      console.error("Upload error:", err);
-      alert("Upload failed ❌");
-    } finally {
-      setLoading(false); // End loading
-      e.target.value = ""; // Clear input so you can upload same file again
-    }
-  };
+  } catch {
+    alert("Upload failed ❌");
+  } finally {
+    setLoading(false);
+    e.target.value = "";
+  }
+};
 
   // Helper to ensure URL is clean
   const getFullUrl = (path) => {
@@ -71,19 +74,37 @@ function Home({ pdfs, setPdfs }) {
     return path.startsWith("http") ? path : `${BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
   };
 const handleDelete = async (id) => {
+  const token = localStorage.getItem("userToken");
+
+  if (!token) {
+    alert("Not logged in");
+    return;
+  }
+
   if (!window.confirm("Delete this PDF?")) return;
 
   try {
     const res = await fetch(`${BASE_URL}/api/pdfs/${id}`, {
       method: "DELETE",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("userToken")}`
+        Authorization: `Bearer ${token}`
       }
     });
+
+    if (res.status === 401) {
+      alert("Session expired. Login again.");
+      return;
+    }
+
+    if (res.status === 403) {
+      alert("You can't delete this file ❌");
+      return;
+    }
 
     if (!res.ok) throw new Error();
 
     setPdfs(prev => prev.filter(p => p._id !== id));
+
   } catch {
     alert("Delete failed ❌");
   }
@@ -150,7 +171,7 @@ const handleDelete = async (id) => {
             >
               🔎 Open PDF
             </a>
-                {(userRole === "admin" || userRole === "creator") && (
+                {(userRole === "admin" || pdf.owner === userId) && (
   <button
     onClick={() => handleDelete(pdf._id)}
     style={{
