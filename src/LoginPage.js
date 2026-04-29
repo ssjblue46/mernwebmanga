@@ -15,15 +15,16 @@ function LoginPage({ setMode, setLoggedIn, setUserRole, setUserEmail }) {
   const [showPassword, setShowPassword] = useState(false);
 
   // Save login properly
-  const saveLogin = (role, email, token) => {
-    localStorage.setItem("userToken", token);
-    localStorage.setItem("userRole", role);
-    localStorage.setItem("userEmail", email);
+const saveLogin = (role, email, token, id) => {
+  localStorage.setItem("userToken", token);
+  localStorage.setItem("userRole", role);
+  localStorage.setItem("userEmail", email);
+  localStorage.setItem("userId", id); // ✅ IMPORTANT
 
-    setUserRole(role);
-    setUserEmail(email);
-    setLoggedIn(true);
-  };
+  setUserRole(role);
+  setUserEmail(email);
+  setLoggedIn(true);
+};
 
   // ✅ MAIN LOGIN (for admin + creator)
   const handleLogin = async () => {
@@ -48,7 +49,7 @@ function LoginPage({ setMode, setLoggedIn, setUserRole, setUserEmail }) {
         const token = res.data.token;
 
         // 🔥 role comes from backend
-        saveLogin(user.role, user.email, token);
+        saveLogin(user.role, user.email, token, user.id);
 
       } else {
         setError("Login failed");
