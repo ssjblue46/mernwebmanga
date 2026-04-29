@@ -10,7 +10,6 @@ const jwt = require("jsonwebtoken");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ===== YOUR MONGO URI (FIXED DB NAME) =====
 const MONGO_URI =
   "mongodb+srv://raj:Raj%40101105@cluster0.3swrnlq.mongodb.net/pdfCollection?retryWrites=true&w=majority&authSource=admin";
 
@@ -21,12 +20,26 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+// ===== AUTH MIDDLEWARE =====
+const authMiddleware = (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "No token" });
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded; // { id, email }
+    next();
+  } catch {
+    res.status(401).json({ message: "Invalid token" });
+  }
+};
+
 // ===== MAIN DB CONNECTION =====
 mongoose.connect(MONGO_URI)
-  .then(() => console.log("✅ MongoDB connected to pdfCollection"))
+  .then(() => console.log("✅ MongoDB connected"))
   .catch(err => console.error("❌ Mongo Error:", err));
 
-// ===== GRIDFS CONNECTION =====
+// ===== GRIDFS =====
 const conn = mongoose.createConnection(MONGO_URI);
 
 let bucket;
@@ -38,16 +51,16 @@ conn.once("open", () => {
   console.log("✅ GridFS ready");
 });
 
-// ===== PDF MODEL =====
+// ===== MODELS =====
 const pdfSchema = new mongoose.Schema({
   name: String,
   fileId: mongoose.Schema.Types.ObjectId,
   url: String,
+  owner: { type: mongoose.Schema.Types.ObjectId, ref: "User" } // ✅ OWNER
 }, { timestamps: true });
 
 const PDF = mongoose.model("PDF", pdfSchema);
 
-// ===== USER MODEL (USES 'users' COLLECTION) =====
 const userSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true },
@@ -56,26 +69,21 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ["admin", "creator", "reader"], default: "reader" },
 }, { timestamps: true });
 
-// FORCE collection name = users
 const User = mongoose.model("User", userSchema, "users");
 
 // ===== GRIDFS STORAGE =====
 const storage = new GridFsStorage({
   url: MONGO_URI,
-  options: { useUnifiedTopology: true, useNewUrlParser: true },
   file: (req, file) => {
     return new Promise((resolve, reject) => {
-
       if (file.mimetype !== "application/pdf") {
         return reject(new Error("Only PDF allowed"));
       }
 
-      const fileInfo = {
+      resolve({
         filename: Date.now() + "-" + file.originalname,
         bucketName: "pdfs",
-      };
-
-      resolve(fileInfo);
+      });
     });
   }
 });
@@ -97,7 +105,6 @@ app.post("/api/signup", async (req, res) => {
 
   try {
     const existing = await User.findOne({ email });
-
     if (existing) {
       return res.status(409).json({ message: "User already exists" });
     }
@@ -109,14 +116,12 @@ app.post("/api/signup", async (req, res) => {
       email: email.toLowerCase(),
       password: hashed,
       company,
-      role: "creator" // ✅ FORCE ROLE HERE
-
+      role: "creator"
     });
 
-    res.json({ success: true, message: "Account created" });
+    res.json({ success: true });
 
-  } catch (err) {
-    console.error(err);
+  } catch {
     res.status(500).json({ message: "Signup failed" });
   }
 });
@@ -125,22 +130,12 @@ app.post("/api/signup", async (req, res) => {
 app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ message: "Missing fields" });
-  }
-
   try {
     const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
-    }
+    if (!user) return res.status(401).json({ message: "User not found" });
 
     const match = await bcrypt.compare(password, user.password);
-
-    if (!match) {
-      return res.status(401).json({ message: "Wrong password" });
-    }
+    if (!match) return res.status(401).json({ message: "Wrong password" });
 
     const token = jwt.sign(
       { id: user._id, email: user.email },
@@ -149,30 +144,23 @@ app.post("/api/login", async (req, res) => {
     );
 
     res.json({
-      success: true,
       token,
       user: {
         name: user.name,
-        email: user.email,
-        company: user.company,
         role: user.role
       }
     });
 
-  } catch (err) {
+  } catch {
     res.status(500).json({ message: "Login failed" });
   }
 });
 
 // ===== PDF ROUTES =====
 
-// UPLOAD
-app.post("/api/pdfs", upload.array("pdfs"), async (req, res) => {
+// UPLOAD (protected)
+app.post("/api/pdfs", authMiddleware, upload.array("pdfs"), async (req, res) => {
   try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ message: "No files uploaded" });
-    }
-
     const savedFiles = [];
 
     for (const file of req.files) {
@@ -180,6 +168,7 @@ app.post("/api/pdfs", upload.array("pdfs"), async (req, res) => {
         name: file.originalname,
         fileId: file.id,
         url: `/api/file/${file.filename}`,
+        owner: req.user.id // ✅ OWNER SAVED
       });
 
       await newPdf.save();
@@ -188,46 +177,41 @@ app.post("/api/pdfs", upload.array("pdfs"), async (req, res) => {
 
     res.status(201).json(savedFiles);
 
-  } catch (err) {
+  } catch {
     res.status(500).json({ message: "Upload failed" });
   }
 });
 
 // GET ALL
 app.get("/api/pdfs", async (req, res) => {
-  try {
-    const pdfs = await PDF.find().sort({ createdAt: -1 });
-    res.json(pdfs);
-  } catch (err) {
-    res.status(500).json({ message: "Fetch failed" });
-  }
+  const pdfs = await PDF.find().sort({ createdAt: -1 });
+  res.json(pdfs);
 });
 
 // STREAM
 app.get("/api/file/:filename", async (req, res) => {
-  try {
-    if (!bucket) return res.status(503).json({ message: "Server not ready" });
+  const file = await bucket.find({ filename: req.params.filename }).next();
+  if (!file) return res.status(404).json({ message: "Not found" });
 
-    const file = await bucket.find({ filename: req.params.filename }).next();
-
-    if (!file) return res.status(404).json({ message: "File not found" });
-
-    res.set("Content-Type", "application/pdf");
-
-    const stream = bucket.openDownloadStream(file._id);
-    stream.pipe(res);
-
-  } catch (err) {
-    res.status(500).json({ message: "Streaming error" });
-  }
+  res.set("Content-Type", "application/pdf");
+  bucket.openDownloadStream(file._id).pipe(res);
 });
 
-// DELETE
-app.delete("/api/pdfs/:id", async (req, res) => {
+// DELETE (protected + role check)
+app.delete("/api/pdfs/:id", authMiddleware, async (req, res) => {
   try {
     const pdf = await PDF.findById(req.params.id);
-
     if (!pdf) return res.status(404).json({ message: "Not found" });
+
+    const user = await User.findById(req.user.id);
+
+    // ❌ BLOCK if not owner AND not admin
+    if (
+      user.role !== "admin" &&
+      pdf.owner.toString() !== req.user.id
+    ) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
 
     if (bucket) {
       await bucket.delete(pdf.fileId);
@@ -237,14 +221,13 @@ app.delete("/api/pdfs/:id", async (req, res) => {
 
     res.json({ message: "Deleted" });
 
-  } catch (err) {
+  } catch {
     res.status(500).json({ message: "Delete failed" });
   }
 });
 
 // ===== FRONTEND =====
 app.use(express.static(path.join(__dirname, "build")));
-
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "build", "index.html"));
 });
