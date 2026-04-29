@@ -38,7 +38,11 @@ function Home({ pdfs, setPdfs }) {
 
     try {
       const res = await fetch(`${BASE_URL}/api/pdfs`, {
+         
         method: "POST",
+         headers: {
+    Authorization: `Bearer ${localStorage.getItem("token")}` // ✅ ADD THIS
+  },
         body: formData,
       });
 
@@ -66,7 +70,24 @@ function Home({ pdfs, setPdfs }) {
     if (!path) return "";
     return path.startsWith("http") ? path : `${BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
   };
+const handleDelete = async (id) => {
+  if (!window.confirm("Delete this PDF?")) return;
 
+  try {
+    const res = await fetch(`${BASE_URL}/api/pdfs/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`
+      }
+    });
+
+    if (!res.ok) throw new Error();
+
+    setPdfs(prev => prev.filter(p => p._id !== id));
+  } catch {
+    alert("Delete failed ❌");
+  }
+};
   return (
     <div className="page home-page">
 {(userRole === "admin" || userRole === "creator") ? (
@@ -101,6 +122,23 @@ function Home({ pdfs, setPdfs }) {
   <p style={{ color: "#aaa", marginTop: "10px" }}>
     🔒 Only creators/admin can upload PDFs
   </p>
+)}
+  {(userRole === "admin" || userRole === "creator") && (
+  <button
+    onClick={() => handleDelete(pdf._id)}
+      style={{
+        background: loading ? "#555" : "#1c1c1c",
+        color: "#fff",
+        borderRadius: "30px",
+        padding: "12px 25px",
+        fontWeight: "bold",
+        border: "1px solid #333",
+        cursor: loading ? "not-allowed" : "pointer",
+        fontSize: "16px",
+    }}
+  >
+    🗑 Delete
+  </button>
 )}
       <h2>📁 Manga Collection (PDF)</h2>
 
