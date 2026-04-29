@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 5000;
 const MONGO_URI =
   "mongodb+srv://raj:Raj%40101105@cluster0.3swrnlq.mongodb.net/pdfCollection?retryWrites=true&w=majority&authSource=admin";
 
-const JWT_SECRET = "demo_secret_key";
+const JWT_SECRET = "demo_secret_key"; // (as you said, keeping this)
 
 // ===== MIDDLEWARE =====
 app.use(cors());
@@ -34,7 +34,7 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-// ===== MAIN DB CONNECTION =====
+// ===== DB CONNECTION =====
 mongoose.connect(MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
   .catch(err => console.error("❌ Mongo Error:", err));
@@ -56,7 +56,7 @@ const pdfSchema = new mongoose.Schema({
   name: String,
   fileId: mongoose.Schema.Types.ObjectId,
   url: String,
-  owner: { type: mongoose.Schema.Types.ObjectId, ref: "User" } // ✅ OWNER
+  owner: { type: mongoose.Schema.Types.ObjectId, ref: "User" }
 }, { timestamps: true });
 
 const PDF = mongoose.model("PDF", pdfSchema);
@@ -144,9 +144,12 @@ app.post("/api/login", async (req, res) => {
     );
 
     res.json({
+      success: true,
       token,
       user: {
+        _id: user._id,        // ✅ FIXED
         name: user.name,
+        email: user.email,    // ✅ FIXED
         role: user.role
       }
     });
@@ -158,9 +161,13 @@ app.post("/api/login", async (req, res) => {
 
 // ===== PDF ROUTES =====
 
-// UPLOAD (protected)
+// UPLOAD
 app.post("/api/pdfs", authMiddleware, upload.array("pdfs"), async (req, res) => {
   try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ message: "No files uploaded" });
+    }
+
     const savedFiles = [];
 
     for (const file of req.files) {
@@ -168,7 +175,7 @@ app.post("/api/pdfs", authMiddleware, upload.array("pdfs"), async (req, res) => 
         name: file.originalname,
         fileId: file.id,
         url: `/api/file/${file.filename}`,
-        owner: req.user.id // ✅ OWNER SAVED
+        owner: req.user.id
       });
 
       await newPdf.save();
@@ -184,20 +191,37 @@ app.post("/api/pdfs", authMiddleware, upload.array("pdfs"), async (req, res) => 
 
 // GET ALL
 app.get("/api/pdfs", async (req, res) => {
-  const pdfs = await PDF.find().sort({ createdAt: -1 });
-  res.json(pdfs);
+  try {
+    const pdfs = await PDF.find().sort({ createdAt: -1 });
+    res.json(pdfs);
+  } catch {
+    res.status(500).json({ message: "Fetch failed" });
+  }
 });
 
 // STREAM
 app.get("/api/file/:filename", async (req, res) => {
-  const file = await bucket.find({ filename: req.params.filename }).next();
-  if (!file) return res.status(404).json({ message: "Not found" });
+  try {
+    if (!bucket) {
+      return res.status(503).json({ message: "Server not ready" });
+    }
 
-  res.set("Content-Type", "application/pdf");
-  bucket.openDownloadStream(file._id).pipe(res);
+    const file = await bucket.find({ filename: req.params.filename }).next();
+
+    if (!file) {
+      return res.status(404).json({ message: "Not found" });
+    }
+
+    res.set("Content-Type", "application/pdf");
+
+    bucket.openDownloadStream(file._id).pipe(res);
+
+  } catch {
+    res.status(500).json({ message: "Streaming error" });
+  }
 });
 
-// DELETE (protected + role check)
+// DELETE
 app.delete("/api/pdfs/:id", authMiddleware, async (req, res) => {
   try {
     const pdf = await PDF.findById(req.params.id);
@@ -205,10 +229,9 @@ app.delete("/api/pdfs/:id", authMiddleware, async (req, res) => {
 
     const user = await User.findById(req.user.id);
 
-    // ❌ BLOCK if not owner AND not admin
     if (
       user.role !== "admin" &&
-      pdf.owner.toString() !== req.user.id
+      (!pdf.owner || pdf.owner.toString() !== req.user.id)
     ) {
       return res.status(403).json({ message: "Not allowed" });
     }
@@ -228,6 +251,7 @@ app.delete("/api/pdfs/:id", authMiddleware, async (req, res) => {
 
 // ===== FRONTEND =====
 app.use(express.static(path.join(__dirname, "build")));
+
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "build", "index.html"));
 });
