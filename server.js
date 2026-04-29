@@ -10,260 +10,146 @@ const jwt = require("jsonwebtoken");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-const MONGO_URI =
-  "mongodb+srv://raj:Raj%40101105@cluster0.3swrnlq.mongodb.net/pdfCollection?retryWrites=true&w=majority&authSource=admin";
+const MONGO_URI = "YOUR_MONGO_URI";
+const JWT_SECRET = "demo_secret_key";
 
-const JWT_SECRET = "demo_secret_key"; // (as you said, keeping this)
-
-// ===== MIDDLEWARE =====
+// ===== CORS FIX =====
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // ===== AUTH MIDDLEWARE =====
 const authMiddleware = (req, res, next) => {
-  console.log("HEADERS:", req.headers.authorization); // 👈 ADD THIS
+  const header = req.headers.authorization;
 
-  const token = req.headers.authorization?.split(" ")[1];
+  if (!header) return res.status(401).json({ message: "No token" });
 
-  if (!token) return res.status(401).json({ message: "No token" });
+  const token = header.split(" ")[1];
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch {
-    res.status(401).json({ message: "Invalid token" });
+    return res.status(401).json({ message: "Invalid token" });
   }
 };
 
-// ===== DB CONNECTION =====
-mongoose.connect(MONGO_URI)
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch(err => console.error("❌ Mongo Error:", err));
+// ===== DB =====
+mongoose.connect(MONGO_URI);
 
 // ===== GRIDFS =====
 const conn = mongoose.createConnection(MONGO_URI);
-
 let bucket;
 
 conn.once("open", () => {
   bucket = new mongoose.mongo.GridFSBucket(conn.db, {
     bucketName: "pdfs",
   });
-  console.log("✅ GridFS ready");
 });
 
 // ===== MODELS =====
-const pdfSchema = new mongoose.Schema({
+const PDF = mongoose.model("PDF", new mongoose.Schema({
   name: String,
   fileId: mongoose.Schema.Types.ObjectId,
   url: String,
-  owner: { type: mongoose.Schema.Types.ObjectId, ref: "User" }
-}, { timestamps: true });
+  owner: mongoose.Schema.Types.ObjectId
+}, { timestamps: true }));
 
-const PDF = mongoose.model("PDF", pdfSchema);
-
-const userSchema = new mongoose.Schema({
+const User = mongoose.model("User", new mongoose.Schema({
   name: String,
-  email: { type: String, unique: true },
+  email: String,
   password: String,
-  company: String,
-  role: { type: String, enum: ["admin", "creator", "reader"], default: "reader" },
-}, { timestamps: true });
+  role: String
+}), "users");
 
-const User = mongoose.model("User", userSchema, "users");
-
-// ===== GRIDFS STORAGE =====
+// ===== STORAGE =====
 const storage = new GridFsStorage({
   url: MONGO_URI,
-  file: (req, file) => {
-    return new Promise((resolve, reject) => {
-      if (file.mimetype !== "application/pdf") {
-        return reject(new Error("Only PDF allowed"));
-      }
-
-      resolve({
-        filename: Date.now() + "-" + file.originalname,
-        bucketName: "pdfs",
-      });
-    });
-  }
+  file: (req, file) => ({
+    filename: Date.now() + "-" + file.originalname,
+    bucketName: "pdfs"
+  })
 });
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 50 * 1024 * 1024 }
-});
+const upload = multer({ storage });
 
-// ===== AUTH ROUTES =====
-
-// SIGNUP
-app.post("/api/signup", async (req, res) => {
-  const { name, email, password, company } = req.body;
-
-  if (!name || !email || !password || !company) {
-    return res.status(400).json({ message: "All fields required" });
-  }
-
-  try {
-    const existing = await User.findOne({ email });
-    if (existing) {
-      return res.status(409).json({ message: "User already exists" });
-    }
-
-    const hashed = await bcrypt.hash(password, 10);
-
-    await User.create({
-      name,
-      email: email.toLowerCase(),
-      password: hashed,
-      company,
-      role: "creator"
-    });
-
-    res.json({ success: true });
-
-  } catch {
-    res.status(500).json({ message: "Signup failed" });
-  }
-});
-
-// LOGIN
+// ===== LOGIN =====
 app.post("/api/login", async (req, res) => {
-  const { email, password } = req.body;
+  const user = await User.findOne({ email: req.body.email });
 
-  try {
-    const user = await User.findOne({ email });
-    if (!user) return res.status(401).json({ message: "User not found" });
+  if (!user) return res.status(401).json({ message: "User not found" });
 
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(401).json({ message: "Wrong password" });
+  const match = await bcrypt.compare(req.body.password, user.password);
 
-    const token = jwt.sign(
-      { id: user._id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: "1d" }
-    );
+  if (!match) return res.status(401).json({ message: "Wrong password" });
 
-    res.json({
-      success: true,
-      token,
-      user: {
-        _id: user._id,        // ✅ FIXED
-        name: user.name,
-        email: user.email,    // ✅ FIXED
-        role: user.role
-      }
-    });
+  const token = jwt.sign(
+    { id: user._id, role: user.role },
+    JWT_SECRET,
+    { expiresIn: "1d" }
+  );
 
-  } catch {
-    res.status(500).json({ message: "Login failed" });
-  }
+  res.json({
+    success: true,
+    token,
+    user: { role: user.role, email: user.email }
+  });
 });
 
-// ===== PDF ROUTES =====
-
-// UPLOAD
+// ===== UPLOAD =====
 app.post("/api/pdfs", authMiddleware, upload.array("pdfs"), async (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ message: "No files uploaded" });
-    }
+  const saved = [];
 
-    const savedFiles = [];
-
-    for (const file of req.files) {
-      const newPdf = new PDF({
-        name: file.originalname,
-        fileId: file.id,
-        url: `/api/file/${file.filename}`,
-        owner: req.user.id
-      });
-
-      await newPdf.save();
-      savedFiles.push(newPdf);
-    }
-
-    res.status(201).json(savedFiles);
-
-  } catch {
-    res.status(500).json({ message: "Upload failed" });
+  for (const file of req.files) {
+    const pdf = await PDF.create({
+      name: file.originalname,
+      fileId: file.id,
+      url: `/api/file/${file.filename}`,
+      owner: req.user.id
+    });
+    saved.push(pdf);
   }
+
+  res.json(saved);
 });
 
-// GET ALL
+// ===== GET =====
 app.get("/api/pdfs", async (req, res) => {
-  try {
-    const pdfs = await PDF.find().sort({ createdAt: -1 });
-    res.json(pdfs);
-  } catch {
-    res.status(500).json({ message: "Fetch failed" });
-  }
+  const pdfs = await PDF.find().sort({ createdAt: -1 });
+  res.json(pdfs);
 });
 
-// STREAM
-app.get("/api/file/:filename", async (req, res) => {
-  try {
-    if (!bucket) {
-      return res.status(503).json({ message: "Server not ready" });
-    }
-
-    const file = await bucket.find({ filename: req.params.filename }).next();
-
-    if (!file) {
-      return res.status(404).json({ message: "Not found" });
-    }
-
-    res.set("Content-Type", "application/pdf");
-
-    bucket.openDownloadStream(file._id).pipe(res);
-
-  } catch {
-    res.status(500).json({ message: "Streaming error" });
-  }
-});
-
-// DELETE
+// ===== DELETE =====
 app.delete("/api/pdfs/:id", authMiddleware, async (req, res) => {
-  try {
-    const pdf = await PDF.findById(req.params.id);
-    if (!pdf) return res.status(404).json({ message: "Not found" });
+  const pdf = await PDF.findById(req.params.id);
+  if (!pdf) return res.status(404).json({ message: "Not found" });
 
-    const user = await User.findById(req.user.id);
-
-    if (
-      user.role !== "admin" &&
-      (!pdf.owner || pdf.owner.toString() !== req.user.id)
-    ) {
-      return res.status(403).json({ message: "Not allowed" });
-    }
-
-    if (bucket) {
-      await bucket.delete(pdf.fileId);
-    }
-
-    await PDF.findByIdAndDelete(req.params.id);
-
-    res.json({ message: "Deleted" });
-
-  } catch {
-    res.status(500).json({ message: "Delete failed" });
+  if (
+    req.user.role !== "admin" &&
+    pdf.owner.toString() !== req.user.id
+  ) {
+    return res.status(403).json({ message: "Not allowed" });
   }
+
+  await bucket.delete(pdf.fileId);
+  await PDF.findByIdAndDelete(req.params.id);
+
+  res.json({ message: "Deleted" });
 });
 
-// ===== FRONTEND =====
-app.use(express.static(path.join(__dirname, "build")));
+// ===== FILE STREAM =====
+app.get("/api/file/:filename", async (req, res) => {
+  const file = await bucket.find({ filename: req.params.filename }).next();
+  if (!file) return res.status(404).json({ message: "Not found" });
 
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "build", "index.html"));
+  res.set("Content-Type", "application/pdf");
+  bucket.openDownloadStream(file._id).pipe(res);
 });
 
-// ===== START =====
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log("Server running"));
